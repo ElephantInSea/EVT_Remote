@@ -6,6 +6,10 @@
 
 typedef unsigned char uc;
 
+const uc Translate_num_to_LED[10] = {
+//  0,	  1,	2,	  3,	4,	  5,	6,	  7,	8,	  9.
+	0x3F, 0x06, 0x5B, 0x4F, 0x67, 0x6D, 0x7D, 0x70, 0x7F, 0x6F};
+	
 interrupt iServer(void)
 {
 	multi_interrupt_entry_and_save
@@ -34,14 +38,18 @@ interrupt iServer(void)
 void main(void)
 {
 	uc d_line = 0, d_bonus = 0;
-    
+    uc LED[5] = {0, 0, 0, 0, 0};
+    uc temp = 0;
 	while (1)
 	{
-		PORTD = d_bonus | (0x01 << d_line);
+		temp = d_bonus | (0x03 << d_line);
+		PORTD = temp;
 		d_line ++;
 		if (d_line > 4)
 			d_line = 0;
 		
-			
+		temp = LED[(int)d_line];
+		temp = Translate_num_to_LED[(int)temp];
+		PORTC = temp;
 	}
 }
