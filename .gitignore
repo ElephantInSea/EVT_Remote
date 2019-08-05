@@ -1,6 +1,7 @@
 # Dev Compiler Files
 *.dev
 *.layout
+*.asm
 *.bin
 *.bat
 *.err
