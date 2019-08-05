@@ -1,4 +1,5 @@
-/*Description. Описание.*/
+/*05 08 2019
+Работа с портом Д.*/
 #include "1886ve4d.h"
 #include "int17xxx.h"
 #pragma origin 0x8
@@ -32,8 +33,15 @@ interrupt iServer(void)
 
 void main(void)
 {
-
+	uc d_line = 0, d_bonus = 0;
+    
 	while (1)
 	{
+		PORTD = d_bonus | (0x01 << d_line);
+		d_line ++;
+		if (d_line > 4)
+			d_line = 0;
+		
+			
 	}
 }
