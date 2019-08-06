@@ -56,7 +56,7 @@ void main(void)
 	led_active = 0;
     uc temp = 0;
     
-    uc mode = 0;
+    uc mode = 0, mode_temp = 0, mode_time = 0;
     uc buttons = 0, buttons_time = 0; // , buttons_time_out = 255
     btns_action(0);
 	while (1)
@@ -73,8 +73,26 @@ void main(void)
 		PORTC = temp;
 		
 		temp = PORTE >> 3;
-		if(d_line & 0x01)	// mode
+		if((d_line & 0x01) && (temp > 0))	// mode
 		{
+			if (d_line == 3)
+				temp |= 0x80;	// 0b100xxxxx
+				
+			if (mode != temp)
+			{
+				if( mode_temp == temp)
+				{
+					mode_time ++;
+					if (mode_time > 20)
+						mode = temp;
+				}
+				else
+				{
+					mode = 255;
+					mode_temp = temp;
+					mode_time = 0;
+				}
+			}	
 		}
 		else	//Buttons
 		{
