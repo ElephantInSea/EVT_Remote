@@ -41,9 +41,10 @@ interrupt iServer(void)
 /******************/
 
 #include "math24.h"
-
+#include "Functions.h"
 void Btns_action (uc btn);
 void Send();
+bit Check(uc num);
 
 void main(void)
 {
@@ -62,6 +63,8 @@ void main(void)
 	LED [2] = 0;
 	LED [3] = 0;
 	LED [4] = 0;
+    Check(255);
+    
 	led_active = 0;
     int led_blink = 0;
 	uc temp = 0;
@@ -131,96 +134,4 @@ void main(void)
 	}
 }
 
-void Btns_action (uc btn)
-{
-	uc temp = btn, count = 0;
-	while(temp)
-	{
-		if (temp & 1)
-			count ++;
-		temp = temp >> 1;
-	}
-	if (count != 1)
-		return;
-		
-	if (btn & 0x01)	// Up
-	{
-		LED[led_active] = LED[led_active] + 1;
-		if (LED[led_active] > 9)
-			LED[led_active] = 0;
-	}
-	else if (btn & 0x02)	// Down
-	{
-		if (LED[led_active] == 9)
-			LED[led_active] = 10;
-		LED[led_active] = LED[led_active] - 1;
-	}
-	else if (btn & 0x04)	// Left
-	{
-		if (led_active < 0)
-			led_active = 5;
-		led_active --;
-	}
-	else if (btn & 0x08)	// Right
-	{
-		led_active ++;
-		if (led_active > 4)
-			led_active = 0;
-	}
-	else if (btn & 0x10)	// Send
-	/* TODO (#1#): Дописать функцию отправки */
-	{}
-	return;
-}
-
-void Send()
-{
-	if (mode == 255)
-	{
-		not_send = 1;
-		return;
-	}
-	// работа функции опирается на ожидание что данные 
-	// не превышают лимиты.
-	// Как проверить 2047?
-	uc Package [4], temp = 0;
-	
-	//Package [0]
-	Package[0] = 0;
-	temp = mode & 0x1F;	// 0b00011111
-	while (temp != 0x01)
-	{
-		temp = temp >> 1;
-		Package[0] += 1;
-	}
-	if (mode & 0x80)
-	{
-		if (mode & 0x10)
-			Package[0] = 12;	// Авария
-		else
-			Package[0] += 5;
-	}
-	
-	//Package [1]
-	//if (mode & 0x90)	// 0b10010000
-	if (Package[0] == 12)
-	{	
-		Package[1] = LED[4] << 6;
-		Package[2] = Package[3] = 0;
-	}
-	else
-	{
-		Package[1] = LED[0];
-		Package[2] = (LED[1] << 4) | LED[2];
-		Package[3] = (LED[3] << 4) | LED[4];
-	}
-	Package[1] |= 0x80;
-	/* TODO (#1#): Узнать, будет ли режим чтения у запросов */
-	
-	
-	Package[0] = (Package[0] << 4) | 0x0F;
-	/* TODO (#1#): Дописать непосредственно отправку посылки */
-	
-	
-	return;
-}
+#include "Functions.c"
