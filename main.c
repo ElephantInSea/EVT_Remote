@@ -2,7 +2,8 @@
 /*05 08 2019
 Работа с портом Д. Сделано.
 Работа с портом Ц. Сделано.
-Работа с портом Е.*/
+Работа с портом Е. Сделано.
+Внутренние связи компонентов.*/
 #include "1886ve4d.h"
 #include "int17xxx.h"
 #pragma origin 0x8
@@ -65,7 +66,7 @@ void main(void)
 	LED [4] = 0;
     Check(255);
     
-	led_active = 0;
+	led_active = 4;	// При запуске  будет активен крайне правый индикатор
     int led_blink = 0;
 	uc temp = 0;
     
@@ -115,17 +116,19 @@ void main(void)
 					mode = 255;
 					mode_temp = temp;
 					mode_time = 0;
+					led_active = 4;
+					LED[0] = LED[1] = LED[2] = LED[3] = LED[4] = 0;
 				}
 			}	
 		}
-		else	//Buttons
+		else if ((mode & 0x01) == 0)	//Buttons
 		{
 			if (temp == buttons)
 			{
 				if (buttons_time <= 50)
 					buttons_time ++;
 					/* TODO (#2#): Функция зажатия клавиши - таймаута */
-				if (buttons_time == 50)
+				if (buttons_time == 50 || not_send)
 					Btns_action (buttons);
 			}
 			else 

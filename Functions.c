@@ -1,3 +1,4 @@
+/*Проект "Ответчик". Ассоциация ЭВТ.*/
 
 void Btns_action (uc btn)
 {
@@ -19,13 +20,13 @@ void Btns_action (uc btn)
 	}
 	else if (btn & 0x02)	// Down
 	{
-		if (LED[led_active] == 9)
+		if (LED[led_active] == 0)
 			LED[led_active] = 10;
 		LED[led_active] = LED[led_active] - 1;
 	}
 	else if (btn & 0x04)	// Left
 	{
-		if (led_active < 0)
+		if (led_active == 0)
 			led_active = 5;
 		led_active --;
 	}
@@ -36,8 +37,7 @@ void Btns_action (uc btn)
 			led_active = 0;
 	}
 	else if (btn & 0x10)	// Send
-	/* TODO (#1#): Дописать функцию отправки */
-	{}
+		Send();
 	return;
 }
 
@@ -48,9 +48,6 @@ void Send()
 		not_send = 1;
 		return;
 	}
-	// работа функции опирается на ожидание что данные 
-	// не превышают лимиты.
-	// Как проверить 2047?
 	
 	uc Package [4], temp = 0;
 	
@@ -70,8 +67,7 @@ void Send()
 			Package[0] += 5;
 	}
 	
-	
-	if (Check(Package[0]))
+	if (Check(Package[0]) == 0)
 		return;
 	
 	//Package [1]
@@ -94,7 +90,28 @@ void Send()
 	Package[0] = (Package[0] << 4) | 0x0F;
 	/* TODO (#1#): Дописать непосредственно отправку посылки */
 	
-	
+	//for (i=0;i<4;i++)
+	int i = 0, max = 4;
+	while (i < max)
+	{	
+		if (TXIF == 1)	// TXIF или TRMT.
+		{
+			bit parity = 0;
+			int t = (int)Package[i];
+			while (t)
+			{
+				if (t & 0x01)
+					parity = !parity;
+				t = t >> 1;
+			}
+			TX9D = parity; //1
+			
+			TXREG = Package[i];
+			TXEN = 1;
+			i++;
+		}
+		not_send = 0;
+	}
 	return;
 }
 

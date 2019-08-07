@@ -1,3 +1,4 @@
+/*Проект "Ответчик". Ассоциация ЭВТ.*/
 
 void Btns_action (uc btn);
 void Send();
