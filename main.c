@@ -14,6 +14,8 @@ const uc Translate_num_to_LED[10] = {
 	0xC0, 0xF9, 0xA4, 0xB0, 0x98, 0x92, 0x82, 0xF8, 0x80, 0x90};
 uc LED [5];
 int led_active;
+bit not_send;
+uc mode;
 
 interrupt iServer(void)
 {
@@ -40,10 +42,17 @@ interrupt iServer(void)
 
 #include "math24.h"
 
-void btns_action (uc btn);
+void Btns_action (uc btn);
+void Send();
 
 void main(void)
 {
+    Btns_action(0);	// потому что компилятор.
+    Send();
+    
+    not_send = 0;
+    mode = 0;
+    
 	int d_line = 0;
 	uc d_bonus = 0;
 	//uc LED[5] = {0, 0, 0, 0, 0};
@@ -54,11 +63,11 @@ void main(void)
 	LED [3] = 0;
 	LED [4] = 0;
 	led_active = 0;
-    uc temp = 0;
+    int led_blink = 0;
+	uc temp = 0;
     
-    uc mode = 0, mode_temp = 0, mode_time = 0;
+    uc mode_temp = 0, mode_time = 0;
     uc buttons = 0, buttons_time = 0; // , buttons_time_out = 255
-    btns_action(0);
 	while (1)
 	{
 		temp = 0x03 << d_line;
@@ -68,9 +77,21 @@ void main(void)
 		if (d_line > 4)
 			d_line = 0;
 		
-		temp = LED[(int)d_line];
-		temp = Translate_num_to_LED[(int)temp];
+		if (d_line == led_active)
+		{
+			led_blink ++;
+			if (led_blink > 2)	// задержка для моргания
+				led_blink = 0;
+		}
+		if ((d_line == led_active) && led_blink) 
+			temp = 0;	
+		else
+		{
+			temp = LED[(int)d_line];
+			temp = Translate_num_to_LED[(int)temp];
+		}
 		PORTC = temp;
+		/* DONE (#1#): Настроить мигание выбранного индикатора */
 		
 		temp = PORTE >> 3;
 		if((d_line & 0x01) && (temp > 0))	// mode
@@ -102,7 +123,7 @@ void main(void)
 					buttons_time ++;
 					/* TODO (#2#): Функция зажатия клавиши - таймаута */
 				if (buttons_time == 50)
-					btns_action (buttons);
+					Btns_action (buttons);
 			}
 			else 
 				buttons_time = 0;
@@ -110,7 +131,7 @@ void main(void)
 	}
 }
 
-void btns_action (uc btn)
+void Btns_action (uc btn)
 {
 	uc temp = btn, count = 0;
 	while(temp)
@@ -149,5 +170,57 @@ void btns_action (uc btn)
 	else if (btn & 0x10)	// Send
 	/* TODO (#1#): Дописать функцию отправки */
 	{}
+	return;
+}
+
+void Send()
+{
+	if (mode == 255)
+	{
+		not_send = 1;
+		return;
+	}
+	// работа функции опирается на ожидание что данные 
+	// не превышают лимиты.
+	// Как проверить 2047?
+	uc Package [4], temp = 0;
+	
+	//Package [0]
+	Package[0] = 0;
+	temp = mode & 0x1F;	// 0b00011111
+	while (temp != 0x01)
+	{
+		temp = temp >> 1;
+		Package[0] += 1;
+	}
+	if (mode & 0x80)
+	{
+		if (mode & 0x10)
+			Package[0] = 12;	// Авария
+		else
+			Package[0] += 5;
+	}
+	
+	//Package [1]
+	//if (mode & 0x90)	// 0b10010000
+	if (Package[0] == 12)
+	{	
+		Package[1] = LED[4] << 6;
+		Package[2] = Package[3] = 0;
+	}
+	else
+	{
+		Package[1] = LED[0];
+		Package[2] = (LED[1] << 4) | LED[2];
+		Package[3] = (LED[3] << 4) | LED[4];
+	}
+	Package[1] |= 0x80;
+	/* TODO (#1#): Узнать, будет ли режим чтения у запросов */
+	
+	
+	Package[0] = (Package[0] << 4) | 0x0F;
+	/* TODO (#1#): Дописать непосредственно отправку посылки */
+	
+	
 	return;
 }
