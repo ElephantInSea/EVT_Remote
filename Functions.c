@@ -1,4 +1,4 @@
-/*Ïğîåêò "Îòâåò÷èê". Àññîöèàöèÿ İÂÒ.*/
+/*The project "Respondent". Association "EVT".*/
 
 void Btns_action (uc btn)
 {
@@ -37,16 +37,60 @@ void Btns_action (uc btn)
 			led_active = 0;
 	}
 	else if (btn & 0x10)	// Send
-		Send();
+	{
+		//Send(count_error)
+		send_mode = 1;
+	}
 	return;
 }
 
-void Send()
+bit Check(uc num)
+{
+	if (num > 13)
+		return 0;
+		
+	int i = 0;
+	int24 led_max = 1;	
+	if (num == 0)
+		led_max = 199;
+	else if (num == 1)
+		led_max = 99999;
+	else if (num == 2)
+		led_max = 1999;
+	else if (num == 3)
+		led_max = 100;
+	else if (num > 5 && num < 9)	// 6, 7, 8
+		led_max = 2047;	
+	
+	int24 led_real = 0;
+	int24 factor = 1;
+	for (i = 0; i < 5; i ++)
+	{
+		int j = 0, j_max = (int)LED[i];
+		int24 temp = 0;
+		//led_real += factor * temp;	compilator fail
+		for (j = 0; j < j_max; j ++)
+			temp += factor;
+			
+		led_real += temp;
+		factor = factor * 10;
+	}
+	if (led_real > led_max)
+		return 0;	
+	return 1;
+}
+
+void Read_Msg()
+{
+	return;
+}
+
+bit Send()
 {
 	if (mode == 255)
 	{
-		not_send = 1;
-		return;
+		//not_send = 1;
+		return 0;
 	}
 	
 	uc Package [4], temp = 0;
@@ -68,7 +112,7 @@ void Send()
 	}
 	
 	if (Check(Package[0]) == 0)
-		return;
+		return 0;
 	
 	//Package [1]
 	//if (mode & 0x90)	// 0b10010000
@@ -110,43 +154,12 @@ void Send()
 			TXEN = 1;
 			i++;
 		}
-		not_send = 0;
+		//not_send = 0;
 	}
-	return;
+	return 1;
 }
 
-bit Check(uc num)
+void Show_ERROR(bit flag_error)
 {
-	if (num > 13)
-		return 0;
-		
-	int i = 0;
-	int24 led_max = 1;	
-	if (num == 0)
-		led_max = 199;
-	else if (num == 1)
-		led_max = 99999;
-	else if (num == 2)
-		led_max = 1999;
-	else if (num == 3)
-		led_max = 100;
-	else if (num > 5 && num < 9)	// 6, 7, 8
-		led_max = 2047;	
-	
-	int24 led_real = 0;
-	int24 factor = 1;
-	for (i = 0; i < 5; i ++)
-	{
-		int j = 0, j_max = (int)LED[i];
-		int24 temp = 0;
-		//led_real += factor * temp;	compilator fail
-		for (j = 0; j < j_max; j ++)
-			temp += factor;
-			
-		led_real += temp;
-		factor = factor * 10;
-	}
-	if (led_real > led_max)
-		return 0;	
-	return 1;
+	return;
 }

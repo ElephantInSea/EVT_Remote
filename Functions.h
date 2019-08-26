@@ -1,5 +1,7 @@
-/*Проект "Ответчик". Ассоциация ЭВТ.*/
+/*The project "Respondent". Association "EVT".*/
 
 void Btns_action (uc btn);
-void Send();
 bit Check(uc num);
+void Read_Msg();
+bit Send();
+void Show_ERROR(bit flag_error);
