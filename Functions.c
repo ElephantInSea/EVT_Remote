@@ -38,8 +38,41 @@ void Btns_action (uc btn)
 	}
 	else if (btn & 0x10)	// Send
 	{
-		//Send(count_error)
+		static int send_error_count;
+		static int send_mode_count;	// Send iteration
+		if( send_mode == 0)
+		{
+			send_error_count = 0;
+			send_mode_count = 0;
+		}
+		
 		send_mode = 1;
+		if(Send())
+			send_error_count ++;
+		send_mode_count ++;
+		
+		for (temp = 0; temp < 255; temp ++)
+			for (count = 0; count < 255; count ++){};
+		
+		/* TODO (#1#): Написать обаботчик прерывания по заполнению 
+		               буфера. */
+		
+		if (msg_received || (send_mode_count > 2))
+		{
+			/* TODO (#1#): Функция вывода принятых 
+			данных на экран */
+			if(Read_Msg() == 0)
+			{
+				if(send_error_count >= send_mode_count)
+					send_mode = 0;
+				/* TODO (#1#): Нужна функции которая бы 
+				отображала аварию. */
+				Show_ERROR(send_mode);
+			}
+			// Exit conditions
+			send_error_count = send_mode_count = 0;
+			send_mode = msg_received = 0;
+		}
 	}
 	return;
 }
@@ -80,15 +113,18 @@ bit Check(uc num)
 	return 1;
 }
 
-void Read_Msg()
+bit Read_Msg()
 {
-	return;
+	// Если есть пометка о записи/ чтении - сравнение или помещение в 
+	// индикаторы.
+	return 1;
 }
 
 bit Send()
 {
 	if (mode == 255)
 	{
+		// Здесь получится баг, т.к. в режиме отправки mode не изменится.
 		//not_send = 1;
 		return 0;
 	}
