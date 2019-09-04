@@ -47,6 +47,8 @@ void Btns_action (uc btn)
 		}
 		
 		send_mode = 1;
+		if (mode == 255)
+			return;
 		if(Send())
 			send_error_count ++;
 		send_mode_count ++;
@@ -121,14 +123,7 @@ bit Read_Msg()
 }
 
 bit Send()
-{
-	if (mode == 255)
-	{
-		// Здесь получится баг, т.к. в режиме отправки mode не изменится.
-		//not_send = 1;
-		return 0;
-	}
-	
+{	
 	uc Package [4], temp = 0;
 	
 	//Package [0]
@@ -166,13 +161,12 @@ bit Send()
 	Package[1] |= 0x80;
 	/* TODO (#1#): Узнать, будет ли режим чтения у запросов */
 	
-	
 	Package[0] = (Package[0] << 4) | 0x0F;
-	/* TODO (#1#): Дописать непосредственно отправку посылки */
 	
 	//for (i=0;i<4;i++)
 	int i = 0, max = 4;
-	while (i < max)
+	temp = 0;
+	while ((i < max) && (temp < 250))
 	{	
 		if (TXIF == 1)	// TXIF или TRMT.
 		{
@@ -190,8 +184,14 @@ bit Send()
 			TXEN = 1;
 			i++;
 		}
+		else
+		{
+			temp ++;
+		}
 		//not_send = 0;
 	}
+	if (i == max)
+		return 0;
 	return 1;
 }
 

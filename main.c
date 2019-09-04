@@ -104,7 +104,7 @@ void main(void)
 				led_blink = 0;
 		}
 		
-		if ((d_line == led_active) && led_blink) 
+		if ((d_line == led_active) && led_blink)
 			temp = 0;
 		else
 		{
