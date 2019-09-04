@@ -9,6 +9,7 @@ void Btns_action (uc btn)
 			count ++;
 		temp = temp >> 1;
 	}
+	// Will not work if none is pressed, or pressed more than 2
 	if (count != 1)
 		return;
 		
@@ -40,13 +41,13 @@ void Btns_action (uc btn)
 	{
 		static int send_error_count;
 		static int send_mode_count;	// Send iteration
-		if( send_mode == 0)
+		if( flag_send_mode == 0)	// First start
 		{
 			send_error_count = 0;
 			send_mode_count = 0;
 		}
 		
-		send_mode = 1;
+		flag_send_mode = 1;
 		if (mode == 255)
 			return;
 		if(Send())
@@ -56,24 +57,23 @@ void Btns_action (uc btn)
 		for (temp = 0; temp < 255; temp ++)
 			for (count = 0; count < 255; count ++){};
 		
-		/* TODO (#1#): Написать обаботчик прерывания по заполнению 
+		/* TODO (#1#): Написать обработчик прерывания по заполнению 
 		               буфера. */
-		
-		if (msg_received || (send_mode_count > 2))
+		               
+		// Exit conditions
+		if (flag_msg_received || (send_mode_count > 2))
 		{
 			/* TODO (#1#): Функция вывода принятых 
-			данных на экран */
+			данных на экран. Т.е. 4 принятые посылки трансформировать в числа */
 			if(Read_Msg() == 0)
 			{
-				if(send_error_count >= send_mode_count)
-					send_mode = 0;
 				/* TODO (#1#): Нужна функции которая бы 
 				отображала аварию. */
-				Show_ERROR(send_mode);
+				Show_ERROR(flag_send_mode);
 			}
-			// Exit conditions
+			
 			send_error_count = send_mode_count = 0;
-			send_mode = msg_received = 0;
+			flag_send_mode = flag_msg_received = 0;
 		}
 	}
 	return;
@@ -117,8 +117,8 @@ bit Check(uc num)
 
 bit Read_Msg()
 {
-	// Если есть пометка о записи/ чтении - сравнение или помещение в 
-	// индикаторы.
+	// Если есть пометка о записи/ чтении - сравнение или помещение принятых
+	// данных в индикаторы.
 	return 1;
 }
 
@@ -197,5 +197,6 @@ bit Send()
 
 void Show_ERROR(bit flag_error)
 {
+	// Возможно с помощью лампочек Авария/Работа 
 	return;
 }

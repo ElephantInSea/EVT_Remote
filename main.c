@@ -17,17 +17,69 @@ uc LED [5];
 int led_active;
 uc mode;
 
-bit send_mode;
-bit msg_received;
+bit flag_send_mode;
+bit flag_msg_received;
+bit flag_parity_check;
 // Cells for receiving messages
 uc a, b, c, d;
-
+uc count_receive_data;
 interrupt iServer(void)
 {
 	multi_interrupt_entry_and_save
 
 	PERIPHERAL_service:
 		PEIF = 0;
+		/*Прием даных. В a, b, c, d
+		msg_received = 1;*/
+		uc fuze = 0;
+		uc parity_marker = 0;	// Маркер четности для всех сообщений
+								// Parity marker for all messages
+		// RCIF == Флаг запроса прерывания от приемника USART
+		while (RCIF && (fuze < 50) && OERR == 0)	
+		{
+			fuze ++;
+			// RCIF = 0; // Read only
+			
+			count_receive_data++;
+			uc mail = RCREG;
+			// Проверка четного бита
+			if (flag_parity_check)
+			{
+				/* TODO (#1#): Написать функцию провекри четности, и 
+				               продумать реакцию. */
+				// Вероятно компилятор не переварит конструкцию
+				//parity_marker |= Parity_check(mail,RX9D) << count_receive_data;
+			}
+			if (count_receive_data == 0)
+				a = mail;
+			else if (count_receive_data == 1)
+				b = mail;
+			else if (count_receive_data == 2)
+				c = mail;
+			else
+			{
+				d = mail;
+				count_receive_data = 0;
+				flag_msg_received = 1;
+				fuze = 51; // RCIF должен быть сброшен. Это излишек.
+				// Выключить приемник?
+				// Включать сначала передачи. 
+			}
+			fuze ++;
+			// Что делать с ошибками OERR FERR?
+			if (OERR && parity_marker)
+			{
+				flag_msg_received = 0;
+				// Нужно написать еще один флаг об ошибке приема. 
+				// Что бы не ожидать таймер отправки следующего сообщения.
+			}
+			if (OERR)
+			{
+				CREN = 0;
+				// ...
+				CREN = 1;
+			}
+		}
 		interrupt_exit_and_restore
 	TMR0_service:
 		// save on demand: PRODL,PRODH,TBLPTRH,TBLPTRL,FSR0,FSR1
@@ -42,6 +94,9 @@ interrupt iServer(void)
 	INT_service:
 		INTF = 0;
 		interrupt_exit_and_restore
+		
+	/*Прием даных. В a, b, c, d
+	msg_received = 1;*/
 }
 /******************/
 
@@ -55,10 +110,10 @@ void main(void)
     Btns_action(0);	// Bugs and features of the compiler
     Send();
     
-    send_mode = 0;		// Turn on to receive data
+    flag_send_mode = 0;		// Turn on to receive data
     int send_mode_count = 0;	// Send iteration
     int send_error_count = 0;	
-    msg_received = 0;	// Flag of received message
+    flag_msg_received = 0;	// Flag of received message
     
 	int d_line = 0;	// Working indicator number
 	uc d_bonus = 0; // In case of work with 1 and 0 bits of port D
@@ -72,11 +127,12 @@ void main(void)
     uc mode_temp = 0, mode_time = 0;
     uc buttons = 0, buttons_time = 0; 
     
-    
+    count_receive_data = 0;
+    a = b = c = d = 0;
+    flag_parity_check = 0;
 	while (1)
 	{
-		
-		if (send_mode == 1)
+		if (flag_send_mode == 1)
 		{
 			if (mode == 255)
 			{
@@ -108,7 +164,8 @@ void main(void)
 			temp = 0;
 		else
 		{
-			temp = LED[(int)d_line];
+			temp = LED[(int)d_line];// The order of indicators is determined 
+									// here.
 			temp = Translate_num_to_LED[(int)temp];
 		}
 		PORTC = temp;
