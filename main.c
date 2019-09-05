@@ -20,6 +20,7 @@ uc mode;
 bit flag_send_mode;
 bit flag_msg_received;
 bit flag_parity_check;
+bit flag_receive_error;
 // Cells for receiving messages
 uc a, b, c, d;
 uc count_receive_data;
@@ -63,6 +64,8 @@ interrupt iServer(void)
 				flag_msg_received = 1;
 				fuze = 51; // RCIF должен быть сброшен. Это излишек.
 				// Выключить приемник?
+				// Receiver OFF
+				CREN = 0;
 				// Включать сначала передачи. 
 			}
 			fuze ++;
@@ -78,6 +81,8 @@ interrupt iServer(void)
 				CREN = 0;
 				// ...
 				CREN = 1;
+				//FERR
+				flag_receive_error = 0;
 			}
 		}
 		interrupt_exit_and_restore
@@ -130,6 +135,8 @@ void main(void)
     count_receive_data = 0;
     a = b = c = d = 0;
     flag_parity_check = 0;
+    flag_receive_error = 0;
+    
 	while (1)
 	{
 		if (flag_send_mode == 1)
@@ -170,6 +177,8 @@ void main(void)
 		}
 		PORTC = temp;
 		
+		/* TODO (#1#): Что делать с 14м контактом, который 
+		               RE2_WR_TXOE? */
 		
 		temp = (PORTE ^ 0xF8) >> 3;	// Port E is inverted
 		if((d_line & 0x01) && (temp > 0))	// mode
