@@ -21,6 +21,7 @@ bit flag_send_mode;
 bit flag_msg_received;
 bit flag_parity_check;
 bit flag_receive_error;
+bit flag_manual_auto;
 // Cells for receiving messages
 uc a, b, c, d;
 uc count_receive_data;
@@ -29,28 +30,34 @@ interrupt iServer(void)
 	multi_interrupt_entry_and_save
 
 	PERIPHERAL_service:
-		PEIF = 0;
-		/*Прием даных. В a, b, c, d
-		msg_received = 1;*/
+		/*Прием даных. В a, b, c, d */
+		
+		/* Сейчас любая ошибка будет выглядеть одинаково.
+		Что бы вывести разницу, следует вводить флаги.*/
+		
 		uc fuze = 0;
 		uc parity_marker = 0;	// Маркер четности для всех сообщений
 								// Parity marker for all messages
 		// RCIF == Флаг запроса прерывания от приемника USART
-		while (RCIF && (fuze < 50) && OERR == 0)	
+		while (RCIF && (fuze < 50) && (OERR == 0) && FERR == 0)	
 		{
 			fuze ++;
 			// RCIF = 0; // Read only
 			
 			count_receive_data++;
+			// bit flag_parity = RX9D; // Без рабочей проверки четности не нужен
 			uc mail = RCREG;
+			// Переменная mail нужна для проверки четности. 
 			// Проверка четного бита
 			if (flag_parity_check)
 			{
 				/* TODO (#1#): Написать функцию провекри четности, и 
 				               продумать реакцию. */
 				// Вероятно компилятор не переварит конструкцию
-				//parity_marker |= Parity_check(mail,RX9D) << count_receive_data;
+				/*parity_marker |= Parity_check(mail,flag_parity) << 
+				count_receive_data;*/
 			}
+			
 			if (count_receive_data == 0)
 				a = mail;
 			else if (count_receive_data == 1)
@@ -69,22 +76,21 @@ interrupt iServer(void)
 				// Включать сначала передачи. 
 			}
 			fuze ++;
-			// Что делать с ошибками OERR FERR?
-			if (OERR && parity_marker)
-			{
-				flag_msg_received = 0;
-				// Нужно написать еще один флаг об ошибке приема. 
-				// Что бы не ожидать таймер отправки следующего сообщения.
-			}
-			if (OERR)
-			{
-				CREN = 0;
-				// ...
-				CREN = 1;
-				//FERR
-				flag_receive_error = 0;
-			}
+			
 		}
+		// Что делать с ошибками OERR FERR?
+		if (OERR || parity_marker || FERR)
+		{
+			flag_msg_received = 0;
+			flag_receive_error = 1;
+			count_receive_data = 0;
+		}
+		if (OERR)
+		{
+			CREN = 0; // Включается в функции Send()
+		}
+		PEIF = 0;
+		PIR1 = 0; // На всякий случай
 		interrupt_exit_and_restore
 	TMR0_service:
 		// save on demand: PRODL,PRODH,TBLPTRH,TBLPTRL,FSR0,FSR1
@@ -110,6 +116,51 @@ interrupt iServer(void)
 
 void main(void)
 {
+	
+	GLINTD = 1;		// Запрет всех прерываний
+	PORTE = 0x00;
+	DDRE  = 0x00;	// Питание индикатора и опроса кнопок
+	PORTC = 0x00;
+	DDRC  = 0x00;	// Значение индикатора
+	PORTD = 0x00;  
+	DDRD  = 0x00;
+	
+	// Инициализация портов и сигнал о запуске
+	DDRE = 0;
+	PORTE = 0x2E; // 0b00101110
+	//uc i;
+	//for (i=0;i<255;i++);
+	
+	uc temp = 0;
+	uc d_bonus = 0;
+	//int8 led_blink = 0;
+	
+	//PORTE  = 0x00;
+	//DDRE = 0xEE;	// 3-0 leds, 0 off
+	
+	for (temp = 0; temp < 255; temp ++)
+		for (d_bonus = 0; d_bonus < 255; d_bonus ++);
+		
+	PIR1    = 0x00;	// Сброс флагов запросов прерываний
+	PIE1    = 0x01;	// Установка RCIE: Бит разрешения прерывания от 
+					// приемника USART (в буфере приемника есть данные
+	T0STA   = 0x28;	// Включение TMR0 (внутр. тактовая частота, предделитель 1:16)
+	// T0STA не имеет значения, т.к. прерывания не разрешены
+	INTSTA  = 0x08;	// Установка PEIE
+	
+	TXSTA = 0x42;	// 0b01000010 9бит, асинхрон,
+	RCSTA = 0x90;	// 0b10010000 вкл порт, 9бит, непрерывный прием
+	SPBRG = 0x9B;	// 155
+	USB_CTRL = 0x01;	// Запуск USB. Low Speed (1.5 Мбит/c),
+	
+	
+	GLINTD  = 0; // Сброс бита запрета всех прерываний
+	CREN = 0;
+	
+	
+	DDRE = 0xF8; // Кнопки и переключатели
+	PORTE = 0;
+	
 	LED[0] = LED[1] = LED[2] = LED[3] = LED[4] = 0;
     Check(255);
     Btns_action(0);	// Bugs and features of the compiler
@@ -118,15 +169,14 @@ void main(void)
     flag_send_mode = 0;		// Turn on to receive data
     int send_mode_count = 0;	// Send iteration
     int send_error_count = 0;	
-    flag_msg_received = 0;	// Flag of received message
     
 	int d_line = 0;	// Working indicator number
-	uc d_bonus = 0; // In case of work with 1 and 0 bits of port D
+	d_bonus = 0; // In case of work with 1 and 0 bits of port D
 	
 	led_active = 4;	// The number of the selected indicator. 
 					// 4 is the far left
     int led_blink = 0;
-	uc temp = 0;
+	temp = 0;
     
     mode = 0;
     uc mode_temp = 0, mode_time = 0;
@@ -136,6 +186,7 @@ void main(void)
     a = b = c = d = 0;
     flag_parity_check = 0;
     flag_receive_error = 0;
+    flag_msg_received = 0;	// Flag of received message
     
 	while (1)
 	{
@@ -179,7 +230,7 @@ void main(void)
 		
 		/* TODO (#1#): Что делать с 14м контактом, который 
 		               RE2_WR_TXOE? */
-		
+		flag_manual_auto = (PORTE ^ 0x04) >> 2; //0b00000100
 		temp = (PORTE ^ 0xF8) >> 3;	// Port E is inverted
 		if((d_line & 0x01) && (temp > 0))	// mode
 		{

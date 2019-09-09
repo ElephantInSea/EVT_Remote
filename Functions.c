@@ -62,7 +62,7 @@ void Btns_action (uc btn)
 				if (flag_receive_error)
 					max = 0;
 			}
-		
+		flag_receive_error = 0;
 		/* TODO (#1#): Написать обработчик прерывания по заполнению 
 		               буфера. Какого, интересно?*/
 		               
@@ -225,6 +225,10 @@ bit Send()
 		Package[3] = (LED[3] << 4) | LED[4];
 	}
 	Package[1] |= 0x80;
+	
+	if (flag_manual_auto)
+		Package[1] |= 0x20;
+		
 	/* TODO (#1#): Узнать, будет ли режим чтения у запросов */
 	
 	Package[0] = (Package[0] << 4) | 0x0F;
@@ -232,8 +236,10 @@ bit Send()
 	//for (i=0;i<4;i++)
 	int i = 0, max = 4;
 	temp = 0;
+	
 	// Receiver ON
 	CREN = 1;	
+	
 	while ((i < max) && (temp < 250))
 	{	
 		if (TXIF == 1)	// TXIF или TRMT.
