@@ -62,6 +62,7 @@ void Btns_action (uc btn)
 				if (flag_receive_error)
 					max = 0;
 			}
+			
 		flag_receive_error = 0;
 		/* TODO (#1#): Написать обработчик прерывания по заполнению 
 		               буфера. Какого, интересно?*/
@@ -73,14 +74,20 @@ void Btns_action (uc btn)
 			данных на экран. Т.е. 4 принятые посылки трансформировать в числа */
 			if(Read_Msg() == 0)
 			{
+				// устарело. Внутри Read_Msg будет отметка об ошибке
 				/* TODO (#1#): Нужна функции которая бы 
 				отображала аварию. */
-				Show_ERROR(flag_send_mode);
+				//Show_ERROR(flag_send_mode);
 			}
 			// Receive OFF
+			if (flag_msg_received)	// Если появилось сообщение 
+				flag_msg_received = 0;
+			if (send_mode_count > 2) // Больше 2х попыток уже.
+			{
+				send_error_count = send_mode_count = 0;
+				flag_send_mode = 0;
+			}
 			CREN = 0;
-			send_error_count = send_mode_count = 0;
-			flag_send_mode = flag_msg_received = 0;
 		}
 	}
 	return;
@@ -271,8 +278,41 @@ bit Send()
 	 
 }
 
-void Show_ERROR(bit flag_error)
+uc Show_ERROR()
 {
-	// Возможно с помощью лампочек Авария/Работа 
-	return;
+	static uc time;
+	static bit flag_blink;
+	if (error_code == 3)	// Alarm signal, 12 mode 
+		return 0x01;
+	else if (error_code == 2)	// Line break
+	{
+		time --;
+		if (time <= 0)
+		{
+			time = 255;
+			if (flag_blink)
+				flag_blink = 0;
+			else
+				flag_blink = 1;
+		}	
+		
+		if (flag_blink)
+			return 0x01;
+		else
+			return 0x02;
+	}
+	else if( error_code == 1)	// Line Parity
+	{
+		time = 10;
+		error_code = 0;
+	}	
+
+	if (time)
+	{
+		time --;
+		return 0x01;
+	}
+	else
+		return 0x02;
+	
 }

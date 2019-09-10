@@ -25,6 +25,9 @@ bit flag_manual_auto;
 // Cells for receiving messages
 uc a, b, c, d;
 uc count_receive_data;
+uc d_work_light;
+uc error_code;
+
 interrupt iServer(void)
 {
 	multi_interrupt_entry_and_save
@@ -132,14 +135,14 @@ void main(void)
 	//for (i=0;i<255;i++);
 	
 	uc temp = 0;
-	uc d_bonus = 0;
+	d_work_light = 0;
 	//int8 led_blink = 0;
 	
 	//PORTE  = 0x00;
 	//DDRE = 0xEE;	// 3-0 leds, 0 off
 	
 	for (temp = 0; temp < 255; temp ++)
-		for (d_bonus = 0; d_bonus < 255; d_bonus ++);
+		for (d_work_light = 0; d_work_light < 255; d_work_light ++);
 		
 	PIR1    = 0x00;	// Сброс флагов запросов прерываний
 	PIE1    = 0x01;	// Установка RCIE: Бит разрешения прерывания от 
@@ -171,7 +174,7 @@ void main(void)
     int send_error_count = 0;	
     
 	int d_line = 0;	// Working indicator number
-	d_bonus = 0; // In case of work with 1 and 0 bits of port D
+	uc d_work_light = 0; // In case of work with 1 and 0 bits of port D
 	
 	led_active = 4;	// The number of the selected indicator. 
 					// 4 is the far left
@@ -187,6 +190,7 @@ void main(void)
     flag_parity_check = 0;
     flag_receive_error = 0;
     flag_msg_received = 0;	// Flag of received message
+    error_code = 0;
     
 	while (1)
 	{
@@ -205,7 +209,7 @@ void main(void)
 		
 		
 		temp = 0x08 << d_line;
-		temp |= d_bonus;
+		temp |= Show_ERROR (); //d_work_light;
 		PORTD = temp;
 		d_line ++;
 		if (d_line > 4)
@@ -230,7 +234,10 @@ void main(void)
 		
 		/* TODO (#1#): Что делать с 14м контактом, который 
 		               RE2_WR_TXOE? */
-		flag_manual_auto = (PORTE ^ 0x04) >> 2; //0b00000100
+		if (PORTE & 0x40)			//0b00000100
+			flag_manual_auto = 0;	// invert
+		else
+			flag_manual_auto = 1;
 		temp = (PORTE ^ 0xF8) >> 3;	// Port E is inverted
 		if((d_line & 0x01) && (temp > 0))	// mode
 		{

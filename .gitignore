@@ -11,6 +11,9 @@
 *.occ
 *.var
 
+#My string
+~$de Notes.docx
+
 # Prerequisites
 *.d
 
