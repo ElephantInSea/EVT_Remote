@@ -18,14 +18,15 @@ int led_active;
 uc mode;
 
 bit flag_send_mode;
+bit flag_rw; // 0 read, 1 write
 bit flag_msg_received;
-bit flag_parity_check;
-bit flag_receive_error;
+bit flag_parity_check; // Not used == error_code
+bit flag_receive_error;	// Not used == error_code
 bit flag_manual_auto;
 // Cells for receiving messages
 uc a, b, c, d;
 uc count_receive_data;
-uc d_work_light;
+uc d_work_light;	// Not used - return by Show_error()
 uc error_code;
 
 interrupt iServer(void)
@@ -47,7 +48,6 @@ interrupt iServer(void)
 			fuze ++;
 			// RCIF = 0; // Read only
 			
-			count_receive_data++;
 			// bit flag_parity = RX9D; // Без рабочей проверки четности не нужен
 			uc mail = RCREG;
 			// Переменная mail нужна для проверки четности. 
@@ -70,7 +70,7 @@ interrupt iServer(void)
 			else
 			{
 				d = mail;
-				count_receive_data = 0;
+				//count_receive_data = 0;
 				flag_msg_received = 1;
 				fuze = 51; // RCIF должен быть сброшен. Это излишек.
 				// Выключить приемник?
@@ -78,6 +78,7 @@ interrupt iServer(void)
 				CREN = 0;
 				// Включать сначала передачи. 
 			}
+			count_receive_data++;
 			fuze ++;
 			
 		}
@@ -119,95 +120,27 @@ interrupt iServer(void)
 
 void main(void)
 {
-	
-	GLINTD = 1;		// Запрет всех прерываний
-	PORTE = 0x00;
-	DDRE  = 0x00;	// Питание индикатора и опроса кнопок
-	PORTC = 0x00;
-	DDRC  = 0x00;	// Значение индикатора
-	PORTD = 0x00;  
-	DDRD  = 0x00;
-	
-	// Инициализация портов и сигнал о запуске
-	DDRE = 0;
-	PORTE = 0x2E; // 0b00101110
-	//uc i;
-	//for (i=0;i<255;i++);
-	
+	Reg_Start_up();
+
 	uc temp = 0;
-	d_work_light = 0;
-	//int8 led_blink = 0;
 	
-	//PORTE  = 0x00;
-	//DDRE = 0xEE;	// 3-0 leds, 0 off
-	
-	for (temp = 0; temp < 255; temp ++)
-		for (d_work_light = 0; d_work_light < 255; d_work_light ++);
-		
-	PIR1    = 0x00;	// Сброс флагов запросов прерываний
-	PIE1    = 0x01;	// Установка RCIE: Бит разрешения прерывания от 
-					// приемника USART (в буфере приемника есть данные
-	T0STA   = 0x28;	// Включение TMR0 (внутр. тактовая частота, предделитель 1:16)
-	// T0STA не имеет значения, т.к. прерывания не разрешены
-	INTSTA  = 0x08;	// Установка PEIE
-	
-	TXSTA = 0x42;	// 0b01000010 9бит, асинхрон,
-	RCSTA = 0x90;	// 0b10010000 вкл порт, 9бит, непрерывный прием
-	SPBRG = 0x9B;	// 155
-	USB_CTRL = 0x01;	// Запуск USB. Low Speed (1.5 Мбит/c),
-	
-	
-	GLINTD  = 0; // Сброс бита запрета всех прерываний
-	CREN = 0;
-	
-	
-	DDRE = 0xF8; // Кнопки и переключатели
-	PORTE = 0;
-	
-	LED[0] = LED[1] = LED[2] = LED[3] = LED[4] = 0;
     Check(255);
     Btns_action(0);	// Bugs and features of the compiler
     Send();
     
-    flag_send_mode = 0;		// Turn on to receive data
     int send_mode_count = 0;	// Send iteration
     int send_error_count = 0;	
     
 	int d_line = 0;	// Working indicator number
 	uc d_work_light = 0; // In case of work with 1 and 0 bits of port D
 	
-	led_active = 4;	// The number of the selected indicator. 
-					// 4 is the far left
     int led_blink = 0;
-	temp = 0;
     
-    mode = 0;
     uc mode_temp = 0, mode_time = 0;
     uc buttons = 0, buttons_time = 0; 
     
-    count_receive_data = 0;
-    a = b = c = d = 0;
-    flag_parity_check = 0;
-    flag_receive_error = 0;
-    flag_msg_received = 0;	// Flag of received message
-    error_code = 0;
-    
 	while (1)
-	{
-		if (flag_send_mode == 1)
-		{
-			if (mode == 255)
-			{
-				if (d_line == 2)
-					d_line = 3;
-				else
-					d_line = 1;
-			}
-			else
-				d_line = 0;
-		}
-		
-		
+	{		
 		temp = 0x08 << d_line;
 		temp |= Show_ERROR (); //d_work_light;
 		PORTD = temp;
@@ -253,7 +186,11 @@ void main(void)
 				{
 					mode_time ++;
 					if (mode_time > 20)
+					{
 						mode = temp;
+						flag_send_mode = 1;
+						flag_rw = 0; //Read
+					}
 				}
 				else
 				{
@@ -285,6 +222,12 @@ void main(void)
 				buttons = temp;
 			}
 		}
+		
+		if ((flag_send_mode == 1) && (mode != 255))
+		{
+			Send_part();
+		}
+		
 	}
 }
 

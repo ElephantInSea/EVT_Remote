@@ -39,56 +39,16 @@ void Btns_action (uc btn)
 	}
 	else if (btn & 0x10)	// Send
 	{
-		static int send_error_count;
-		static int send_mode_count;	// Send iteration
-		if( flag_send_mode == 0)	// First start
+		if(flag_send_mode == 0)
 		{
-			send_error_count = 0;
-			send_mode_count = 0;
+			flag_send_mode = 1;
+			flag_rw = 1; //Write
 		}
-		
-		flag_send_mode = 1;
-		if (mode == 255)
-			return;
-			
-		if(Send())
-			send_error_count ++;
-		send_mode_count ++;
-		
-		uc max = 255;
-		for (temp = 0; temp < max; temp ++)
-			for (count = 0; count < max; count ++)
-			{
-				if (flag_receive_error)
-					max = 0;
-			}
-			
-		flag_receive_error = 0;
-		/* TODO (#1#): Написать обработчик прерывания по заполнению 
-		               буфера. Какого, интересно?*/
-		               
-		// Exit conditions
-		if (flag_msg_received || (send_mode_count > 2))
+		else //STOP sending
 		{
-			/* TODO (#1#): Функция вывода принятых 
-			данных на экран. Т.е. 4 принятые посылки трансформировать в числа */
-			if(Read_Msg() == 0)
-			{
-				// устарело. Внутри Read_Msg будет отметка об ошибке
-				/* TODO (#1#): Нужна функции которая бы 
-				отображала аварию. */
-				//Show_ERROR(flag_send_mode);
-			}
-			// Receive OFF
-			if (flag_msg_received)	// Если появилось сообщение 
-				flag_msg_received = 0;
-			if (send_mode_count > 2) // Больше 2х попыток уже.
-			{
-				send_error_count = send_mode_count = 0;
-				flag_send_mode = 0;
-			}
-			CREN = 0;
+			flag_send_mode = flag_rw = 0;
 		}
+		//--------------------------
 	}
 	return;
 }
@@ -125,7 +85,20 @@ bit Check(uc num)
 		factor = factor * 10;
 	}
 	if (led_real > led_max)
-		return 0;	
+	{
+		//return 0;
+		int24 temp = 10000;
+		for (i = 0; i < 5; i ++)
+		{
+			//Сомневаюсь я
+			factor = led_max / temp;
+			factor = factor % 10;
+			LED[i] = factor;
+			temp /= 10;
+		}
+	}
+		
+			
 	return 1;
 }
 
@@ -190,7 +163,64 @@ bit Read_Msg()
 	return 1;
 }
 
-bit Send()
+void Reg_Start_up ()
+{
+	GLINTD = 1;		// Запрет всех прерываний
+	PORTE = 0x00;
+	DDRE  = 0x00;	// Питание индикатора и опроса кнопок
+	PORTC = 0x00;
+	DDRC  = 0x00;	// Значение индикатора
+	PORTD = 0x00;  
+	DDRD  = 0x00;
+	
+	// Инициализация портов и сигнал о запуске
+	DDRE = 0;
+	PORTE = 0x2E; // 0b00101110
+	
+	for (a = 0; a < 255; a ++)
+		for (b = 0; b < 255; b ++);
+	
+	a = b = 0;	
+	
+	PIR1    = 0x00;	// Сброс флагов запросов прерываний
+	PIE1    = 0x01;	// Установка RCIE: Бит разрешения прерывания от 
+					// приемника USART (в буфере приемника есть данные
+	T0STA   = 0x28;	// Включение TMR0 (внутр. тактовая частота, предделитель 1:16)
+	// T0STA не имеет значения, т.к. прерывания не разрешены
+	INTSTA  = 0x08;	// Установка PEIE
+	
+	TXSTA = 0x42;	// 0b01000010 9бит, асинхрон,
+	RCSTA = 0x90;	// 0b10010000 вкл порт, 9бит, непрерывный прием
+	SPBRG = 0x9B;	// 155
+	USB_CTRL = 0x01;	// Запуск USB. Low Speed (1.5 Мбит/c),
+	
+	
+	GLINTD  = 0; // Сброс бита запрета всех прерываний
+	CREN = 0;
+	
+	
+	DDRE = 0xF8; // Кнопки и переключатели
+	PORTE = 0;
+	
+	
+	LED[0] = LED[1] = LED[2] = LED[3] = LED[4] = 0;
+	
+    flag_send_mode = 0;		// Turn on to receive data
+    flag_rw = 0;
+	led_active = 4;	// The number of the selected indicator. 
+					// 4 is the far left
+    mode = 0;
+    
+    count_receive_data = 0;
+    a = b = c = d = 0;
+    flag_parity_check = 0;
+    flag_receive_error = 0;
+    flag_msg_received = 0;	// Flag of received message
+    error_code = 0;
+    
+}
+
+void Send()
 {	
 	uc Package [4], temp = 0;
 	
@@ -213,25 +243,37 @@ bit Send()
 			Package[0] += 5;
 	}
 	
+	// the mode is greater than 13, or does 
+	// not fit into the limits for the mode
 	if (Check(Package[0]) == 0)
-		return 0;
-	
-	//Package [1]
-	//if (mode & 0x90)	// 0b10010000
-	if (Package[0] == 12 || Package[0] == 4 || Package[0] == 5)
-	{	
-		Package[1] = LED[4];
-		if (Package[0] == 12)
-			Package[1] = Package[1] << 6;
-		Package[2] = Package[3] = 0;
-	}
-	else
 	{
-		Package[1] = LED[0];
-		Package[2] = (LED[1] << 4) | LED[2];
-		Package[3] = (LED[3] << 4) | LED[4];
+		flag_msg_received = 1;
+		return ;//0;
 	}
-	Package[1] |= 0x80;
+	
+	if (flag_rw == 0) // Read
+	{
+		Package[1] = Package[2] = Package[3] = 0;
+	}
+	else //Write
+	{
+		//Package [1]
+		//if (mode & 0x90)	// 0b10010000
+		if (Package[0] == 12 || Package[0] == 4 || Package[0] == 5)
+		{	
+			Package[1] = LED[4];
+			if (Package[0] == 12)
+				Package[1] = Package[1] << 6;
+			Package[2] = Package[3] = 0;
+		}
+		else
+		{
+			Package[1] = LED[0];
+			Package[2] = (LED[1] << 4) | LED[2];
+			Package[3] = (LED[3] << 4) | LED[4];
+		}
+		Package[1] |= 0x80;
+	}
 	
 	if (flag_manual_auto)
 		Package[1] |= 0x20;
@@ -246,6 +288,8 @@ bit Send()
 	
 	// Receiver ON
 	CREN = 1;	
+	count_receive_data = 0; // In case of loss of parcels, or line break
+	flag_msg_received = 0;
 	
 	while ((i < max) && (temp < 250))
 	{	
@@ -266,18 +310,53 @@ bit Send()
 			i++;
 		}
 		else
-		{
-			temp ++;
-		}
+			temp ++;	// fuze
 		//not_send = 0;
 	}
-	if (i == max)
-		return 0;
-	return 1;
+	
+	if (i != max) // Sent more or less
+		error_code = 5; //return 0;
+	return ;//1;
 	/* TODO (#1#): temp - предлохренитель, нигде не используется. */
 	 
 }
 
+void Send_part()
+{
+	static uc i;
+	static uc j;
+	static flag_send;
+	j --;
+	if( j <= 0)
+	{
+		j = 100;
+		i --;
+	}
+	
+	if (i <= 0)
+	{
+		i = 255;
+		//j = 100;
+		if (CREN == 1) // Receiver on
+		{
+			Read_Msg(); 
+			CREN = 0; // Turn off the receiver to clear errors
+		}
+		
+		if (flag_msg_received == 0)
+			Send();
+	}
+	
+	if (flag_msg_received == 1)
+	{
+		flag_msg_received = 0;
+		flag_send_mode = 0;
+		flag_rw = 0;
+	}
+	// count_receive_data = 0; //in Send()
+	
+	// Где вписать функцию проверки сообщения которая меняет коды ошибок, если блин и самй функции чтения нет.
+}
 uc Show_ERROR()
 {
 	static uc time;
