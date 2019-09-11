@@ -55,9 +55,11 @@ void Btns_action (uc btn)
 
 bit Check(uc num)
 {
-	if (num > 13)
+	if (num > 12)
+	{
+		error_code = 4;
 		return 0;
-		
+	}	
 	int i = 0;
 	int24 led_max = 1;	
 	if (num == 0)
@@ -102,7 +104,7 @@ bit Check(uc num)
 	return 1;
 }
 
-bit Read_Msg()
+void Read_Msg()
 {
 	// Call from Send_part()
 	// Если есть пометка о записи/ чтении - сравнение или помещение принятых
@@ -126,24 +128,23 @@ bit Read_Msg()
 		
 	if (temp2 != mode)
 	{
-		error_code = 1; // Writing a separate flag is irrational
-		// flag_correct = 0;
-		// return 0;
+		error_code = 1; 
 	}
 	// Обнаружил ошибку в 0й посылке
 	// Исправил
 	
-	if (error_code > 0)
+	if (error_code == 0)
 	{
 		uc Rcv_numbers [5];
 		
 		Rcv_numbers[0] = Rcv_numbers[1] = 0;
 		Rcv_numbers[2] = Rcv_numbers[3] = Rcv_numbers[4] = 0;
+		
 		// Package[1] - Package[3]
 		if (temp2 == 4 || temp2 == 5)
 			Rcv_numbers[4] = b & 0x01;
-		else if (temp2 == 12)
-			flag_receive_error = 1;
+		else if ((temp2 == 12) || (b & 0x40))	// Alarm signal
+			error_code = 3;
 			//Rcv_numbers[4] = (b & 0x40) >> 6;
 		else
 		{
@@ -154,7 +155,9 @@ bit Read_Msg()
 			Rcv_numbers[4] = d & 0x0F;
 		}
 		
-		if(flag_rw == 1) // Only when recording
+		//(error_code == 0) - Otherwise, the alarm signal will be 
+		// replaced by a parity error
+		if ((flag_rw == 1) || (error_code == 0)) // Only when recording
 			for (temp = 0; temp < 5; temp ++)
 			{
 				temp2 = Rcv_numbers[temp];	// Bugs and features of the compiler
@@ -162,11 +165,11 @@ bit Read_Msg()
 					error_code = 1;
 					// flag_correct = 0;
 					//return 0;
-			}
+			}			
 	}
-	if (error_code == 1)
+	if (error_code > 0)
 		flag_msg_received = 0;
-	return 1;
+	return ;//1;
 }
 
 void Reg_Start_up ()
@@ -229,6 +232,13 @@ void Send()
 {	
 	uc Package [4], temp = 0;
 	
+	// Receiver ON
+	CREN = 1;	
+	count_receive_data = 0; // In case of loss of parcels, or line break
+	a = b = c = d = 0;
+	flag_msg_received = 0;
+	//error_code = 0; //in Read_Msg()
+	
 	//Package [0]
 	Package[0] = 0;
 	temp = mode & 0x1F;	// 0b00011111
@@ -257,9 +267,7 @@ void Send()
 	}
 	
 	if (flag_rw == 0) // Read
-	{
 		Package[1] = Package[2] = Package[3] = 0;
-	}
 	else //Write
 	{
 		//Package [1]
@@ -291,35 +299,26 @@ void Send()
 	int i = 0, max = 5;
 	temp = 0;
 	
-	// Receiver ON
-	CREN = 1;	
-	count_receive_data = 0; // In case of loss of parcels, or line break
-	a = b = c = d = 0;
-	flag_msg_received = 0;
-	//error_code = 0; //in Read_Msg()
 	
 	while ((i < max) && (temp < 250))
 	{	
-		if (TXIF == 1)	// TXIF или TRMT.
+		if (i == 4)
+			TXEN = 0; // Transmitter Turn Off
+		else if (TXIF == 1)	// TXIF или TRMT.
 		{
-			if (i == 4)
-				TXEN = 0; // Transmitter Turn Off
-			else
+			bit parity = 0;
+			int t = (int)Package[i];
+			while (t)
 			{
-				bit parity = 0;
-				int t = (int)Package[i];
-				while (t)
-				{
-					if (t & 0x01)
-						parity = !parity;
-					t = t >> 1;
-				}
-				TX9D = parity; //1
-				
-				TXREG = Package[i];
-				TXEN = 1; // Transmitter Turn On
-				i++;
+				if (t & 0x01)
+					parity = !parity;
+				t = t >> 1;
 			}
+			TX9D = parity; //1
+			
+			TXREG = Package[i];
+			TXEN = 1; // Transmitter Turn On
+			i++;
 		}
 		else
 			temp ++;	// fuze
@@ -348,32 +347,38 @@ void Send_part()
 	
 	if ((i <= 0) || (flag_msg_received == 1))
 	{
-		i = 3;
+		if ( i == 0 )
+		{	
+			i = 3;
+			if (flag_msg_received == 0)
+				error_code = 2;	// Line break
+			}
 		//j = 100;
-		if (CREN == 1) // Receiver on
+		if (flag_msg_received == 1) // Receiver on
 		{
 			Read_Msg(); 
 			if (error_code > 0)
 				flag_msg_received = 0;
-			
-			if (flag_msg_received == 1)
+			else
 			{
 				i = 0;
 				flag_msg_received = 0;
 				flag_send_mode = 0;
 				flag_rw = 0;
 			}
-			CREN = 0; // Turn off the receiver to clear errors
 		}
 		
+		CREN = 0; // Turn off the receiver to clear errors
 		if (flag_msg_received == 0)
 			Send();
 	}
 	
 	// count_receive_data = 0; //in Send()
 	
-	// Где вписать функцию проверки сообщения которая меняет коды ошибок, если блин и самй функции чтения нет.
+	// Где вписать функцию проверки сообщения которая меняет коды ошибок, 
+	// если блин и самй функции чтения нет.
 }
+
 uc Show_ERROR() // Remove 
 {
 	static uc i; // time_show_0;

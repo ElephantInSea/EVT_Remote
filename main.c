@@ -29,72 +29,15 @@ uc count_receive_data;
 uc d_work_light;	// Not used - return by Show_error()
 uc error_code;
 
+#include "Interrupts.h"
+
 interrupt iServer(void)
 {
 	multi_interrupt_entry_and_save
 
 	PERIPHERAL_service:
-		/*Прием даных. В a, b, c, d */
 		
-		/* Сейчас любая ошибка будет выглядеть одинаково.
-		Что бы вывести разницу, следует вводить флаги.*/
-		
-		uc fuze = 0;
-		uc parity_marker = 0;	// Маркер четности для всех сообщений
-								// Parity marker for all messages
-		// RCIF == Флаг запроса прерывания от приемника USART
-		while (RCIF && (fuze < 50) && (OERR == 0) && FERR == 0)	
-		{
-			fuze ++;
-			// RCIF = 0; // Read only
-			
-			// bit flag_parity = RX9D; // Без рабочей проверки четности не нужен
-			uc mail = RCREG;
-			// Переменная mail нужна для проверки четности. 
-			// Проверка четного бита
-			if (flag_parity_check)
-			{
-				/* TODO (#1#): Написать функцию провекри четности, и 
-				               продумать реакцию. */
-				// Вероятно компилятор не переварит конструкцию
-				/*parity_marker |= Parity_check(mail,flag_parity) << 
-				count_receive_data;*/
-			}
-			
-			if (count_receive_data == 0)
-				a = mail;
-			else if (count_receive_data == 1)
-				b = mail;
-			else if (count_receive_data == 2)
-				c = mail;
-			else
-			{
-				d = mail;
-				//count_receive_data = 0;
-				flag_msg_received = 1;
-				fuze = 51; // RCIF должен быть сброшен. Это излишек.
-				// Выключить приемник?
-				// Receiver OFF
-				CREN = 0;
-				// Включать сначала передачи. 
-			}
-			count_receive_data++;
-			fuze ++;
-			
-		}
-		// Что делать с ошибками OERR FERR?
-		if (OERR || parity_marker || FERR)
-		{
-			flag_msg_received = 0;
-			flag_receive_error = 1;
-			count_receive_data = 0;
-		}
-		if (OERR)
-		{
-			CREN = 0; // Включается в функции Send()
-		}
-		PEIF = 0;
-		PIR1 = 0; // На всякий случай
+		Handler_receiver ();
 		interrupt_exit_and_restore
 	TMR0_service:
 		// save on demand: PRODL,PRODH,TBLPTRH,TBLPTRL,FSR0,FSR1
@@ -113,6 +56,8 @@ interrupt iServer(void)
 	/*Прием даных. В a, b, c, d
 	msg_received = 1;*/
 }
+
+#include "Interrupts.c"
 /******************/
 
 #include "math24.h"
@@ -197,6 +142,7 @@ void main(void)
 				else
 				{
 					mode = 255;		// Fuse
+					flag_send_mode = 0;
 					mode_temp = temp;
 					mode_time = 0;
 					led_active = 4;
