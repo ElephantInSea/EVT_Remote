@@ -104,6 +104,7 @@ bit Check(uc num)
 
 bit Read_Msg()
 {
+	// Call from Send_part()
 	// Если есть пометка о записи/ чтении - сравнение или помещение принятых
 	// данных в индикаторы.
 	// bit flag_correct = 1;
@@ -124,42 +125,47 @@ bit Read_Msg()
 		temp2 |= 0x80;
 		
 	if (temp2 != mode)
+	{
+		error_code = 1; // Writing a separate flag is irrational
 		// flag_correct = 0;
-		return 0;
+		// return 0;
+	}
 	// Обнаружил ошибку в 0й посылке
 	// Исправил
 	
-	uc Rcv_numbers [5];
-	
-	Rcv_numbers[0] = Rcv_numbers[1] = 0;
-	Rcv_numbers[2] = Rcv_numbers[3] = Rcv_numbers[4] = 0;
-	// Package[1] - Package[3]
-	if (temp2 == 4 || temp2 == 5)
+	if (error_code > 0)
 	{
-		Rcv_numbers[4] = b & 0x01;
+		uc Rcv_numbers [5];
+		
+		Rcv_numbers[0] = Rcv_numbers[1] = 0;
+		Rcv_numbers[2] = Rcv_numbers[3] = Rcv_numbers[4] = 0;
+		// Package[1] - Package[3]
+		if (temp2 == 4 || temp2 == 5)
+			Rcv_numbers[4] = b & 0x01;
+		else if (temp2 == 12)
+			flag_receive_error = 1;
+			//Rcv_numbers[4] = (b & 0x40) >> 6;
+		else
+		{
+			Rcv_numbers[0] = b & 0x0F;
+			Rcv_numbers[1] = c >> 4;
+			Rcv_numbers[2] = c & 0x0F;
+			Rcv_numbers[3] = d >> 4;
+			Rcv_numbers[4] = d & 0x0F;
+		}
+		
+		if(flag_rw == 1) // Only when recording
+			for (temp = 0; temp < 5; temp ++)
+			{
+				temp2 = Rcv_numbers[temp];	// Bugs and features of the compiler
+				if (LED[temp] != temp2)
+					error_code = 1;
+					// flag_correct = 0;
+					//return 0;
+			}
 	}
-	else if (temp2 == 12)
-	{
-		Rcv_numbers[4] = (b & 0x40) >> 6;
-	}
-	else
-	{
-		Rcv_numbers[0] = b & 0x0F;
-		Rcv_numbers[1] = c >> 4;
-		Rcv_numbers[2] = c & 0x0F;
-		Rcv_numbers[3] = d >> 4;
-		Rcv_numbers[4] = d & 0x0F;
-	}
-	
-	for (temp = 0; temp < 5; temp ++)
-	{
-		temp2 = Rcv_numbers[temp];	// Bugs and features of the compiler
-		if (LED[temp] != temp2)
-			// flag_correct = 0;
-			return 0;
-	}
-	
-	
+	if (error_code == 1)
+		flag_msg_received = 0;
 	return 1;
 }
 
@@ -201,7 +207,6 @@ void Reg_Start_up ()
 	
 	DDRE = 0xF8; // Кнопки и переключатели
 	PORTE = 0;
-	
 	
 	LED[0] = LED[1] = LED[2] = LED[3] = LED[4] = 0;
 	
@@ -283,12 +288,13 @@ void Send()
 	Package[0] = (Package[0] << 4) | 0x0F;
 	
 	//for (i=0;i<4;i++)
-	int i = 0, max = 4;
+	int i = 0, max = 5;
 	temp = 0;
 	
 	// Receiver ON
 	CREN = 1;	
 	count_receive_data = 0; // In case of loss of parcels, or line break
+	a = b = c = d = 0;
 	flag_msg_received = 0;
 	//error_code = 0; //in Read_Msg()
 	
@@ -296,27 +302,33 @@ void Send()
 	{	
 		if (TXIF == 1)	// TXIF или TRMT.
 		{
-			bit parity = 0;
-			int t = (int)Package[i];
-			while (t)
+			if (i == 4)
+				TXEN = 0; // Transmitter Turn Off
+			else
 			{
-				if (t & 0x01)
-					parity = !parity;
-				t = t >> 1;
+				bit parity = 0;
+				int t = (int)Package[i];
+				while (t)
+				{
+					if (t & 0x01)
+						parity = !parity;
+					t = t >> 1;
+				}
+				TX9D = parity; //1
+				
+				TXREG = Package[i];
+				TXEN = 1; // Transmitter Turn On
+				i++;
 			}
-			TX9D = parity; //1
-			
-			TXREG = Package[i];
-			TXEN = 1;
-			i++;
 		}
 		else
 			temp ++;	// fuze
 		//not_send = 0;
 	}
 	
+	
 	if (i != max) // Sent more or less
-		error_code = 5; //return 0;
+		error_code = 4; //return 0;
 	return ;//1;
 	/* TODO (#1#): temp - предлохренитель, нигде не используется. */
 	 
@@ -341,6 +353,8 @@ void Send_part()
 		if (CREN == 1) // Receiver on
 		{
 			Read_Msg(); 
+			if (error_code > 0)
+				flag_msg_received = 0;
 			
 			if (flag_msg_received == 1)
 			{
@@ -361,45 +375,6 @@ void Send_part()
 	// Где вписать функцию проверки сообщения которая меняет коды ошибок, если блин и самй функции чтения нет.
 }
 uc Show_ERROR() // Remove 
-{
-	static uc time;
-	static bit flag_blink;
-	if (error_code == 3)	// Alarm signal, 12 mode 
-		return 0x01;
-	else if (error_code == 2)	// Line break
-	{
-		time --;
-		if (time <= 0)
-		{
-			time = 255;
-			if (flag_blink)
-				flag_blink = 0;
-			else
-				flag_blink = 1;
-		}	
-		
-		if (flag_blink)
-			return 0x01;
-		else
-			return 0x02;
-	}
-	else if( error_code == 1)	// Line Parity
-	{
-		time = 10;
-		error_code = 0;
-	}	
-
-	if (time)
-	{
-		time --;
-		return 0x01;
-	}
-	Show_ERROR2();
-	
-	return 0x02;
-}
-
-uc Show_ERROR2()
 {
 	static uc i; // time_show_0;
 	static uc j; // time_show_1;

@@ -7,4 +7,3 @@ void Reg_Start_up ();
 void Send ();
 void Send_part();
 uc Show_ERROR ();
-uc Show_ERROR2();
