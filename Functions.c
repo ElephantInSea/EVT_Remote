@@ -90,7 +90,7 @@ bit Check(uc num)
 		int24 temp = 10000;
 		for (i = 0; i < 5; i ++)
 		{
-			//Сомневаюсь я
+			//I doubt it - Сомневаюсь я
 			factor = led_max / temp;
 			factor = factor % 10;
 			LED[i] = factor;
@@ -290,6 +290,7 @@ void Send()
 	CREN = 1;	
 	count_receive_data = 0; // In case of loss of parcels, or line break
 	flag_msg_received = 0;
+	//error_code = 0; //in Read_Msg()
 	
 	while ((i < max) && (temp < 250))
 	{	
@@ -325,7 +326,7 @@ void Send_part()
 {
 	static uc i;
 	static uc j;
-	static flag_send;
+	// static flag_send;
 	j --;
 	if( j <= 0)
 	{
@@ -333,13 +334,21 @@ void Send_part()
 		i --;
 	}
 	
-	if (i <= 0)
+	if ((i <= 0) || (flag_msg_received == 1))
 	{
-		i = 255;
+		i = 3;
 		//j = 100;
 		if (CREN == 1) // Receiver on
 		{
 			Read_Msg(); 
+			
+			if (flag_msg_received == 1)
+			{
+				i = 0;
+				flag_msg_received = 0;
+				flag_send_mode = 0;
+				flag_rw = 0;
+			}
 			CREN = 0; // Turn off the receiver to clear errors
 		}
 		
@@ -347,17 +356,11 @@ void Send_part()
 			Send();
 	}
 	
-	if (flag_msg_received == 1)
-	{
-		flag_msg_received = 0;
-		flag_send_mode = 0;
-		flag_rw = 0;
-	}
 	// count_receive_data = 0; //in Send()
 	
 	// Где вписать функцию проверки сообщения которая меняет коды ошибок, если блин и самй функции чтения нет.
 }
-uc Show_ERROR()
+uc Show_ERROR() // Remove 
 {
 	static uc time;
 	static bit flag_blink;
@@ -391,7 +394,48 @@ uc Show_ERROR()
 		time --;
 		return 0x01;
 	}
-	else
-		return 0x02;
+	Show_ERROR2();
 	
+	return 0x02;
+}
+
+uc Show_ERROR2()
+{
+	static uc i; // time_show_0;
+	static uc j; // time_show_1;
+	uc work_led = 0x02;	// 0x02 work; 0x01 error
+	j++;
+	if (j == 255)
+	{
+		j = 0;
+		i ++;		
+	}
+	
+	if(error_code == 0)			// Work
+		i = j = 0;
+	else if (error_code == 1)	// Parity
+	{
+		if (i < 10)
+			work_led = 0x01; 
+		else if (i < 11)
+			i --;
+	}
+	else if(error_code == 2)	// Line is broken
+	{
+		if (i < 128)
+			work_led = 0x01;
+	}
+	else if(error_code == 3)	// 12 mode, Error
+		work_led = 0x01;
+	else if(error_code == 4)	// Send Error
+	{
+		if (i < 128) 
+			work_led = 0x01;
+		else if((work_led > 171) && (work_led <= 214))
+			work_led = 0x01;
+	}
+
+	if (i == 255)
+		i = 0;
+	return work_led;
 }

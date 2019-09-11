@@ -141,6 +141,7 @@ void main(void)
     
 	while (1)
 	{		
+		// PORT D --------------------------------------------------------------
 		temp = 0x08 << d_line;
 		temp |= Show_ERROR (); //d_work_light;
 		PORTD = temp;
@@ -148,6 +149,7 @@ void main(void)
 		if (d_line > 4)
 			d_line = 0;
 		
+		// PORT C --------------------------------------------------------------
 		if (d_line == led_active)	// For two iterations, the selected
 		{							// indicator will be turned off
 			led_blink ++;
@@ -165,12 +167,12 @@ void main(void)
 		}
 		PORTC = temp;
 		
-		/* TODO (#1#): Что делать с 14м контактом, который 
-		               RE2_WR_TXOE? */
+		// PORT E --------------------------------------------------------------
 		if (PORTE & 0x40)			//0b00000100
 			flag_manual_auto = 0;	// invert
 		else
 			flag_manual_auto = 1;
+		
 		temp = (PORTE ^ 0xF8) >> 3;	// Port E is inverted
 		if((d_line & 0x01) && (temp > 0))	// mode
 		{
@@ -222,7 +224,7 @@ void main(void)
 				buttons = temp;
 			}
 		}
-		
+		// Send Part -----------------------------------------------------------
 		if ((flag_send_mode == 1) && (mode != 255))
 		{
 			Send_part();
