@@ -41,8 +41,6 @@ void Handler_receiver ()
 		{
 			while(RCIF)
 				mail = RCREG;
-			flag_msg_received = 1;
-			CREN = 0;
 		}
 		else
 		{
@@ -58,6 +56,11 @@ void Handler_receiver ()
 			}
 			count_receive_data++;
 		}
+	}
+	if ((error_code > 0) || (count_receive_data > 3))
+	{
+		flag_msg_received = 1;
+		CREN = 0;	//Receiver off
 	}
 	PEIF = 0;
 	PIR1 = 0; // На всякий случай

@@ -9,7 +9,7 @@ void Btns_action (uc btn)
 			count ++;
 		temp = temp >> 1;
 	}
-	// Will not work if none is pressed, or pressed more than 2
+	// Will not work if none is pressed, or pressed more than 2 buttons
 	if (count != 1)
 		return;
 		
@@ -247,12 +247,12 @@ void Send()
 		temp = temp >> 1;
 		Package[0] += 1;
 	}
-	Package[0] -= 1; // 0b00000001 == 0) Дальность
+	//Package[0] -= 1; // 0b00000001 == 0) Дальность
 	if (mode & 0x80)
 	{
-		if (mode & 0x10)	// Это потому что авария как режим была
-							// Нужно ли она как режим переключателя 
-							// или я сам ее выставляю - загадка.
+		if (mode & 0x10)	// Авария это сигнал от устройства в поле
+							// Была 12 режимом, но сейчас это 7й бит в 2 слове
+							// 10 режим не занят, и я решил оставить его 12м
 			Package[0] = 12;	// Авария
 		else
 			Package[0] += 5;
@@ -290,8 +290,6 @@ void Send()
 	
 	if (flag_manual_auto)
 		Package[1] |= 0x20;
-		
-	/* TODO (#1#): Узнать, будет ли режим чтения у запросов */
 	
 	Package[0] = (Package[0] << 4) | 0x0F;
 	
@@ -303,7 +301,10 @@ void Send()
 	while ((i < max) && (temp < 250))
 	{	
 		if (i == 4)
+		{
 			TXEN = 0; // Transmitter Turn Off
+			i ++;
+		}
 		else if (TXIF == 1)	// TXIF или TRMT.
 		{
 			bit parity = 0;
@@ -339,7 +340,7 @@ void Send_part()
 	static uc j;
 	// static flag_send;
 	j --;
-	if( j <= 0)
+	if (j <= 0)
 	{
 		j = 100;
 		i --;
@@ -369,7 +370,7 @@ void Send_part()
 		}
 		
 		CREN = 0; // Turn off the receiver to clear errors
-		if (flag_msg_received == 0)
+		if (flag_send_mode == 1)
 			Send();
 	}
 	
