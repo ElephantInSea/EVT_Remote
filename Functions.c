@@ -338,47 +338,40 @@ void Send_part()
 {
 	static uc i;
 	static uc j;
-	// static flag_send;
-	j --;
-	if (j <= 0)
+	static bit flag_waiting_for_package;
+	
+	j ++;
+	if (j > 100)
 	{
-		j = 100;
-		i --;
+		j = 0;
+		i ++;
 	}
 	
-	if ((i <= 0) || (flag_msg_received == 1))
+	if ((i == 0) && (flag_waiting_for_package == 0))
 	{
-		if ( i == 0 )
-		{	
-			i = 3;
-			if (flag_msg_received == 0)
-				error_code = 2;	// Line break
-			}
-		//j = 100;
-		if (flag_msg_received == 1) // Receiver on
+		Send();
+		flag_waiting_for_package = 1;
+	}
+	else if ((i == 3) || (flag_msg_received == 1))
+	{
+		i = 0;
+		if (flag_waiting_for_package == 1)
 		{
-			Read_Msg(); 
-			if (error_code > 0)
-				flag_msg_received = 0;
+			if (flag_msg_received == 0)
+				error_code = 2; // Line break
 			else
 			{
-				i = 0;
+				Read_Msg();
 				flag_msg_received = 0;
-				flag_send_mode = 0;
-				flag_rw = 0;
+				if (error_code  == 0)
+					flag_send_mode = 0;
 			}
 		}
-		
-		CREN = 0; // Turn off the receiver to clear errors
-		if (flag_send_mode == 1)
-			Send();
+		CREN = 0;	// Receiver off
+		flag_waiting_for_package = 0;
 	}
-	
-	// count_receive_data = 0; //in Send()
-	
-	// Где вписать функцию проверки сообщения которая меняет коды ошибок, 
-	// если блин и самй функции чтения нет.
 }
+
 
 uc Show_ERROR() // Remove 
 {
