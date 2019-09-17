@@ -127,26 +127,22 @@ void Read_Msg()
 		temp2 |= 0x80;
 		
 	if (temp2 != mode)
-	{
 		error_code = 1; 
-	}
 	// Обнаружил ошибку в 0й посылке
 	// Исправил
 	
 	if (error_code == 0)
 	{
+		temp = a >> 4;
 		uc Rcv_numbers [5];
 		
 		Rcv_numbers[0] = Rcv_numbers[1] = 0;
 		Rcv_numbers[2] = Rcv_numbers[3] = Rcv_numbers[4] = 0;
 		
 		// Package[1] - Package[3]
-		if (temp2 == 4 || temp2 == 5)
+		if (temp == 4 || temp == 5)
 			Rcv_numbers[4] = b & 0x01;
-		else if ((temp2 == 12) || (b & 0x40))	// Alarm signal
-			error_code = 3;
-			//Rcv_numbers[4] = (b & 0x40) >> 6;
-		else
+		else if (temp < 9) 
 		{
 			Rcv_numbers[0] = b & 0x0F;
 			Rcv_numbers[1] = c >> 4;
@@ -165,10 +161,11 @@ void Read_Msg()
 					error_code = 1;
 					// flag_correct = 0;
 					//return 0;
-			}			
+			}	
+			
+		if ((temp == 12) || (b & 0x40))	// Alarm signal
+			error_code = 3;
 	}
-	if (error_code > 0)
-		flag_msg_received = 0;
 	return ;//1;
 }
 
@@ -221,8 +218,6 @@ void Reg_Start_up ()
     
     count_receive_data = 0;
     a = b = c = d = 0;
-    flag_parity_check = 0;
-    flag_receive_error = 0;
     flag_msg_received = 0;	// Flag of received message
     error_code = 0;
     
@@ -334,11 +329,10 @@ void Send()
 	 
 }
 
-void Send_part()
+void Send_part(bit flag_first_launch)
 {
 	static uc i;
 	static uc j;
-	static bit flag_waiting_for_package;
 	
 	j ++;
 	if (j > 100)
@@ -347,28 +341,22 @@ void Send_part()
 		i ++;
 	}
 	
-	if ((i == 0) && (flag_waiting_for_package == 0))
-	{
+	if (((i == 0) && (j == 1)) || (flag_first_launch == 1))
 		Send();
-		flag_waiting_for_package = 1;
-	}
 	else if ((i == 3) || (flag_msg_received == 1))
 	{
-		i = 0;
-		if (flag_waiting_for_package == 1)
+		i = j = 0;
+		if (flag_msg_received == 1)
 		{
-			if (flag_msg_received == 0)
-				error_code = 2; // Line break
-			else
-			{
-				Read_Msg();
-				flag_msg_received = 0;
-				if (error_code  == 0)
-					flag_send_mode = 0;
-			}
+			Read_Msg();
+			flag_msg_received = 0;
+			if (error_code  == 0)
+				flag_send_mode = 0;
 		}
-		CREN = 0;	// Receiver off
-		flag_waiting_for_package = 0;
+		else
+			error_code = 2; // Line break
+		
+		
 	}
 }
 

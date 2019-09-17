@@ -9,8 +9,11 @@ void Check_mail (uc mail, bit nine)
 			nine = !nine;
 		mail = mail >> 1;
 	}
-	if ((nine == 1 ) || (OERR || FERR))
+	if ((nine == 1) || (OERR || FERR))
+	{
 		error_code = 1;
+		CREN = 0;	//Receiver off
+	}
 }
 
 void Handler_receiver ()

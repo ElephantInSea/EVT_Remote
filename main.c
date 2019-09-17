@@ -20,8 +20,6 @@ uc mode;
 bit flag_send_mode;
 bit flag_rw; // 0 read, 1 write
 bit flag_msg_received;
-bit flag_parity_check; // Not used == error_code
-bit flag_receive_error;	// Not used == error_code
 bit flag_manual_auto;
 // Cells for receiving messages
 uc a, b, c, d;
@@ -84,6 +82,8 @@ void main(void)
     uc mode_temp = 0, mode_time = 0;
     uc buttons = 0, buttons_time = 0; 
     
+    bit flag_first_launch = 1;
+	
 	while (1)
 	{		
 		// PORT D --------------------------------------------------------------
@@ -113,7 +113,7 @@ void main(void)
 		PORTC = temp;
 		
 		// PORT E --------------------------------------------------------------
-		if (PORTE & 0x40)			//0b00000100
+		if (PORTE & 0x40)			//0b01000000
 			flag_manual_auto = 0;	// invert
 		else
 			flag_manual_auto = 1;
@@ -173,7 +173,9 @@ void main(void)
 		// Send Part -----------------------------------------------------------
 		if ((flag_send_mode == 1) && (mode != 255))
 		{
-			Send_part();
+			Send_part(flag_first_launch);
+			if (flag_first_launch)
+				flag_first_launch = 0;
 		}
 		
 	}
