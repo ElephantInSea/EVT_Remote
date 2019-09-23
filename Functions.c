@@ -55,23 +55,25 @@ void Btns_action (uc btn)
 
 bit Check(uc num)
 {
-	if (num > 12)
+	if ((num > 12) || (num == 7))
 	{
 		error_code = 4;
 		return 0;
 	}	
 	int i = 0;
-	int24 led_max = 1;	
+	int24 led_max = 1;
 	if (num == 0)
 		led_max = 199;
 	else if (num == 1)
-		led_max = 99999;
+		return 1;
+		//led_max = 99999; // This is the maximum scoreboard
 	else if (num == 2)
 		led_max = 1999;
 	else if (num == 3)
 		led_max = 100;
-	else if (num > 5 && num < 9)	// 6, 7, 8
+	else if (num > 3 && num < 7)	// 4, 5, 6
 		led_max = 2047;	
+	// For 8 and 9th modes, the limit will remain 1
 	
 	int24 led_real = 0;
 	int24 factor = 1;
@@ -86,29 +88,28 @@ bit Check(uc num)
 		led_real += temp;
 		factor = factor * 10;
 	}
+	
+	//If the limit is exceeded - the display will reset to the maximum value
 	if (led_real > led_max)
 	{
 		//return 0;
 		int24 temp = 10000;
 		for (i = 0; i < 5; i ++)
 		{
-			//I doubt it - Сомневаюсь я
+			//I doubt it
+			// LED[i] = (led max / (10000 / (10^i))) % 10`
 			factor = led_max / temp;
 			factor = factor % 10;
 			LED[i] = factor;
 			temp /= 10;
 		}
 	}
-		
-			
 	return 1;
 }
 
 void Read_Msg()
 {
 	// Call from Send_part()
-	// Если есть пометка о записи/ чтении - сравнение или помещение принятых
-	// данных в индикаторы.
 	// bit flag_correct = 1;
 	// Package[0]
 	uc temp = a >> 4;
@@ -118,8 +119,8 @@ void Read_Msg()
 	{
 		flag_d_line_3 = 1;
 		if (temp == 12)
-			temp = 9;	
-		temp -= 5;	// Проверил в комплияторе - код норм
+			temp = 7;	
+		temp -= 5;	// Checked this code in the online compiler - Works
 	}
 	
 	uc temp2 = 0x01 << temp;
@@ -128,8 +129,6 @@ void Read_Msg()
 		
 	if (temp2 != mode)
 		error_code = 1; 
-	// Обнаружил ошибку в 0й посылке
-	// Исправил
 	
 	if (error_code == 0)
 	{
@@ -140,7 +139,7 @@ void Read_Msg()
 		Rcv_numbers[2] = Rcv_numbers[3] = Rcv_numbers[4] = 0;
 		
 		// Package[1] - Package[3]
-		if (temp == 4 || temp == 5)
+		if (temp == 8 || temp == 9)
 			Rcv_numbers[4] = b & 0x01;
 		else if (temp < 9) 
 		{
@@ -151,7 +150,7 @@ void Read_Msg()
 			Rcv_numbers[4] = d & 0x0F;
 		}
 		
-		//(error_code == 0) - Otherwise, the alarm signal will be 
+		// (error_code == 0) - Otherwise, the alarm signal will be 
 		// replaced by a parity error
 		if ((flag_rw == 1) || (error_code == 0)) // Only when recording
 			for (temp = 0; temp < 5; temp ++)
@@ -161,8 +160,8 @@ void Read_Msg()
 					error_code = 1;
 					// flag_correct = 0;
 					//return 0;
-			}	
-			
+			}
+		
 		if ((temp == 12) || (b & 0x40))	// Alarm signal
 			error_code = 3;
 	}
@@ -214,7 +213,7 @@ void Reg_Start_up ()
     flag_rw = 0;
 	led_active = 4;	// The number of the selected indicator. 
 					// 4 is the far left
-    mode = 0;
+    mode = 255;
     
     count_receive_data = 0;
     a = b = c = d = 0;
@@ -245,13 +244,18 @@ void Send()
 	//Package[0] -= 1; // 0b00000001 == 0) Дальность
 	if (mode & 0x80)
 	{
-		if (mode & 0x10)	// Авария это сигнал от устройства в поле
-							// Была 12 режимом, но сейчас это 7й бит в 2 слове
-							// 10 режим не занят, и я решил оставить его 12м
+		if (mode & 0x04)	// 0b00000100
+							// The alarm signal comes from the device in
+							// the field
+							// Initially, the "Crash" signal was a 12th mode, 
+							// but then it was reduced only to the 7th bit 
+							// in a 1m word
 			Package[0] = 12;	// Авария
 		else
 			Package[0] += 5;
 	}
+	if (Package[0] > 6)		//mode 7 is empty
+		Package[0] += 1;
 	
 	// the mode is greater than 13, or does 
 	// not fit into the limits for the mode
@@ -300,7 +304,7 @@ void Send()
 			TXEN = 0; // Transmitter Turn Off
 			i ++;
 		}
-		else if (TXIF == 1)	// TXIF или TRMT.
+		else if (TXIF == 1)	// TXIF or TRMT.
 		{
 			bit parity = 0;
 			int t = (int)Package[i];
@@ -325,7 +329,6 @@ void Send()
 	if (i != max) // Sent more or less
 		error_code = 4; //return 0;
 	return ;//1;
-	/* TODO (#1#): temp - предлохренитель, нигде не используется. */
 	 
 }
 
