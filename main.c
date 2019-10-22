@@ -26,6 +26,7 @@ uc a, b, c, d;
 uc count_receive_data;
 uc d_work_light;	// Not used - return by Show_error()
 uc error_code;
+uc error_code_interrupt;
 
 #include "Interrupts.h"
 
@@ -86,13 +87,11 @@ void main(void)
 	
 	while (1)
 	{		
+		clrwdt();
 		// PORT D --------------------------------------------------------------
 		temp = 0x08 << d_line;
 		temp |= Show_ERROR (); //d_work_light;
 		PORTD = temp;
-		d_line ++;
-		if (d_line > 4)
-			d_line = 0;
 		
 		// PORT C --------------------------------------------------------------
 		if (d_line == led_active)	// For two iterations, the selected
@@ -112,8 +111,11 @@ void main(void)
 		}
 		PORTC = temp;
 		
+		
+		clrwdt();
+		
 		// PORT E --------------------------------------------------------------
-		if (PORTE & 0x40)			//0b01000000
+		if (PORTE & 0x04)			//0b00000100
 			flag_manual_auto = 0;	// invert
 		else
 			flag_manual_auto = 1;
@@ -150,7 +152,7 @@ void main(void)
 				}
 			}	
 		}
-		else if ((mode & 0x01) == 0)	//Buttons
+		else if ((d_line & 0x01) == 0)	//Buttons
 		{
 			if (temp == buttons)
 			{
@@ -170,6 +172,8 @@ void main(void)
 				buttons = temp;
 			}
 		}
+		clrwdt();
+		
 		// Send Part -----------------------------------------------------------
 		if ((flag_send_mode == 1) && (mode != 255))
 		{
@@ -177,6 +181,10 @@ void main(void)
 			if (flag_first_launch)
 				flag_first_launch = 0;
 		}
+		
+		d_line ++;
+		if (d_line > 4)
+			d_line = 0;
 		
 	}
 }

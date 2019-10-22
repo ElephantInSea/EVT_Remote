@@ -55,11 +55,16 @@ void Btns_action (uc btn)
 
 bit Check(uc num)
 {
+	
+	clrwdt();
 	if ((num > 12) || (num == 7))
 	{
 		error_code = 4;
 		return 0;
 	}	
+	else if (flag_rw == 0) // When reading, only the mode number is important
+		return 1;
+		
 	int i = 0;
 	int24 led_max = 1;
 	if (num == 0)
@@ -70,7 +75,7 @@ bit Check(uc num)
 	else if (num == 2)
 		led_max = 1999;
 	else if (num == 3)
-		led_max = 100;
+		led_max = 99;
 	else if (num > 3 && num < 7)	// 4, 5, 6
 		led_max = 2047;	
 	// For 8 and 9th modes, the limit will remain 1
@@ -109,9 +114,14 @@ bit Check(uc num)
 
 void Read_Msg()
 {
+	
+	clrwdt();
 	// Call from Send_part()
 	// bit flag_correct = 1;
 	// Package[0]
+	
+	error_code = error_code_interrupt;
+	
 	uc temp = a >> 4;
 	bit flag_d_line_3 = 0;
 	
@@ -141,7 +151,7 @@ void Read_Msg()
 		// Package[1] - Package[3]
 		if (temp == 8 || temp == 9)
 			Rcv_numbers[4] = b & 0x01;
-		else if (temp < 9) 
+		else 
 		{
 			Rcv_numbers[0] = b & 0x0F;
 			Rcv_numbers[1] = c >> 4;
@@ -150,19 +160,21 @@ void Read_Msg()
 			Rcv_numbers[4] = d & 0x0F;
 		}
 		
-		// (error_code == 0) - Otherwise, the alarm signal will be 
-		// replaced by a parity error
-		if ((flag_rw == 1) || (error_code == 0)) // Only when recording
-			for (temp = 0; temp < 5; temp ++)
+		
+		for (temp = 0; temp < 5; temp ++)
+		{
+			if (error_code == 0)
 			{
 				temp2 = Rcv_numbers[temp];	// Bugs and features of the compiler
-				if (LED[temp] != temp2)
+				if (flag_rw == 0)
+					LED[temp] = temp2;
+				else if (LED[temp] != temp2)
 					error_code = 1;
-					// flag_correct = 0;
-					//return 0;
 			}
-		
-		if ((temp == 12) || (b & 0x40))	// Alarm signal
+		}
+		// (error_code == 0) - Too many checks, but it saves the operation.
+
+		if (b & 0x40)	// Alarm signal
 			error_code = 3;
 	}
 	return ;//1;
@@ -170,15 +182,15 @@ void Read_Msg()
 
 void Reg_Start_up ()
 {
-	GLINTD = 1;		// Запрет всех прерываний
-	PORTE = 0x00;
-	DDRE  = 0x00;	// Питание индикатора и опроса кнопок
-	PORTC = 0x00;
-	DDRC  = 0x00;	// Значение индикатора
-	PORTD = 0x00;  
+	GLINTD = 1;		// Disable All Interrupts
+	PORTE = 0x00;	// Getting button codes and modes
+	DDRE  = 0x00;
+	PORTC = 0x00;	// Numbers on the scoreboard cell
+	DDRC  = 0x00;
+	PORTD = 0x00;	// Power for indicator and button polling
 	DDRD  = 0x00;
 	
-	// Инициализация портов и сигнал о запуске
+	// Start signal. Only needed for layout
 	DDRE = 0;
 	PORTE = 0x2E; // 0b00101110
 	
@@ -187,24 +199,25 @@ void Reg_Start_up ()
 	
 	a = b = 0;	
 	
-	PIR1    = 0x00;	// Сброс флагов запросов прерываний
-	PIE1    = 0x01;	// Установка RCIE: Бит разрешения прерывания от 
-					// приемника USART (в буфере приемника есть данные
-	T0STA   = 0x28;	// Включение TMR0 (внутр. тактовая частота, предделитель 1:16)
-	// T0STA не имеет значения, т.к. прерывания не разрешены
-	INTSTA  = 0x08;	// Установка PEIE
+	PIR1    = 0x00;	// Reset Interrupt Request Flags
+	PIE1    = 0x01;	// RCIE setting: USART receiver interrupt enable bit 
+					// (there is data in the receiver buffer)
+	T0STA   = 0x28;	// Switching on TMR0 (internal clock frequency, 1:16 pre-selector)
+	// T0STA does not matter since interruptions not allowed
+	INTSTA  = 0x08;	// PEIE setting
 	
-	TXSTA = 0x42;	// 0b01000010 9бит, асинхрон,
-	RCSTA = 0x90;	// 0b10010000 вкл порт, 9бит, непрерывный прием
+	TXSTA = 0x42;	// 0b01000010 9bit, asynchronous,
+	RCSTA = 0x90;	// 0b10010000 on port, 9bit, continuous reception
 	SPBRG = 0x9B;	// 155
-	USB_CTRL = 0x01;	// Запуск USB. Low Speed (1.5 Мбит/c),
+	USB_CTRL = 0x01;	// USB launch. Low Speed (1.5 Мбит/c),
 	
 	
-	GLINTD  = 0; // Сброс бита запрета всех прерываний
+	GLINTD  = 0; // Reset All Interrupt Disable Bit
 	CREN = 0;
 	
 	
-	DDRE = 0xF8; // Кнопки и переключатели
+	DDRE = 0xFC; 	// 0b11111100 Buttons * 5 and MANUAL/AUTO
+	
 	PORTE = 0;
 	
 	LED[0] = LED[1] = LED[2] = LED[3] = LED[4] = 0;
@@ -219,13 +232,14 @@ void Reg_Start_up ()
     a = b = c = d = 0;
     flag_msg_received = 0;	// Flag of received message
     error_code = 0;
-    
+    error_code_interrupt = 0;
 }
 
 void Send()
 {	
 	uc Package [4], temp = 0;
 	
+	clrwdt();
 	// Receiver ON
 	CREN = 1;	
 	count_receive_data = 0; // In case of loss of parcels, or line break
@@ -241,7 +255,7 @@ void Send()
 		temp = temp >> 1;
 		Package[0] += 1;
 	}
-	//Package[0] -= 1; // 0b00000001 == 0) Дальность
+	//Package[0] -= 1; // 0b00000001 == 0) Distance
 	if (mode & 0x80)
 	{
 		if (mode & 0x04)	// 0b00000100
@@ -250,7 +264,7 @@ void Send()
 							// Initially, the "Crash" signal was a 12th mode, 
 							// but then it was reduced only to the 7th bit 
 							// in a 1m word
-			Package[0] = 12;	// Авария
+			Package[0] = 12;	// Crash
 		else
 			Package[0] += 5;
 	}
@@ -293,17 +307,16 @@ void Send()
 	Package[0] = (Package[0] << 4) | 0x0F;
 	
 	//for (i=0;i<4;i++)
-	int i = 0, max = 5;
+	int i = 0, max = 4;
 	temp = 0;
 	
 	
 	while ((i < max) && (temp < 250))
 	{	
+		
+		clrwdt();
 		if (i == 4)
-		{
 			TXEN = 0; // Transmitter Turn Off
-			i ++;
-		}
 		else if (TXIF == 1)	// TXIF or TRMT.
 		{
 			bit parity = 0;
@@ -337,6 +350,8 @@ void Send_part(bit flag_first_launch)
 	static uc i;
 	static uc j;
 	
+	clrwdt();
+	
 	j ++;
 	if (j > 100)
 	{
@@ -369,6 +384,8 @@ uc Show_ERROR() // Remove
 	static uc i; // time_show_0;
 	static uc j; // time_show_1;
 	uc work_led = 0x02;	// 0x02 work; 0x01 error
+	clrwdt();
+	
 	j++;
 	if (j == 255)
 	{

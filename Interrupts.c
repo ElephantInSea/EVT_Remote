@@ -21,7 +21,7 @@ void Handler_receiver ()
 	/*Reception of data in variables a, b, c, d*/
 		
 	if(count_receive_data == 0)
-		error_code = 0;
+		error_code_interrupt = 0;
 	
 	// RCIF == USART receiver interrupt request flag
 	while (RCIF)	
@@ -32,12 +32,7 @@ void Handler_receiver ()
 		uc mail = RCREG;
 				
 		Check_mail (mail, mail_parity);
-		if ((error_code > 0) || (count_receive_data > 3))
-		{
-			while(RCIF)
-				mail = RCREG;
-		}
-		else
+		if ((error_code_interrupt == 0) && (count_receive_data < 4))
 		{
 			if (count_receive_data == 0)
 				a = mail;
@@ -53,7 +48,7 @@ void Handler_receiver ()
 		}
 	}
 	
-	if ((error_code > 0) || (count_receive_data > 3))
+	if ((error_code_interrupt > 0) || (count_receive_data > 3))
 	{
 		flag_msg_received = 1;
 		CREN = 0;	//Receiver off
