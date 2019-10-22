@@ -11,7 +11,7 @@ void Check_mail (uc mail, bit nine)
 	}
 	if ((nine == 1) || (OERR || FERR))
 	{
-		error_code = 1;
+		error_code_interrupt = 1;
 		CREN = 0;	//Receiver off
 	}
 }
