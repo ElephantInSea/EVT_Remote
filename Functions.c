@@ -371,7 +371,7 @@ void Send_part(bit flag_first_launch)
 			if (error_code  == 0)
 				flag_send_mode = 0;
 		}
-		else
+		else if (error_code != 4)
 			error_code = 2; // Line break
 		
 		
@@ -399,8 +399,6 @@ uc Show_ERROR() // Remove
 	{
 		if (i < 10)
 			work_led = 0x01; 
-		else if (i < 11)
-			i --;
 	}
 	else if(error_code == 2)	// Line is broken
 	{
@@ -411,9 +409,9 @@ uc Show_ERROR() // Remove
 		work_led = 0x01;
 	else if(error_code == 4)	// Send Error
 	{
-		if (i < 128) 
+		if (i < 100)//128 
 			work_led = 0x01;
-		else if((work_led > 171) && (work_led <= 214))
+		else if((i > 150) && (i <= 200)) // 171, 214
 			work_led = 0x01;
 	}
 
