@@ -124,11 +124,8 @@ void main(void)
 		if((d_line & 0x01) && (temp > 0))	// mode
 		{
 			// Parity condition and nonzero reception
+			temp = Get_port_e(d_line);
 			
-			// Mark of the second line of switches
-			if (d_line == 3)
-				temp |= 0x80;	// 0b100xxxxx
-				
 			if (mode != temp)
 			{
 				if(mode_temp == temp)
@@ -159,7 +156,7 @@ void main(void)
 				if (buttons_time <= 50)	// A pressed key will work
 					buttons_time ++;	// only once
 					//
-				if (buttons_time == 50)
+				if ((buttons_time == 50) && buttons > 0)
 				{
 					/* TODO (#1#): Определить что делать с неотправленным 
 					               сообщением */

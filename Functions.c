@@ -112,6 +112,25 @@ bit Check(uc num)
 	return 1;
 }
 
+uc Get_port_e(uc part)
+{
+	uc ans = 0;
+	if (part == 3)
+		ans += 5;
+	
+	part = (PORTE ^ 0xF8) >> 3; // 0b000xxxxx
+	
+	while (part != 0x01)
+	{
+		part = part >> 1;
+		ans += 1;
+	}
+	if (ans > 6)
+		ans += 1;
+	/* Here you can enter the setting of the amplitude mode 1, 2, 3 */
+	return ans;
+}
+
 void Read_Msg()
 {
 	
@@ -123,21 +142,8 @@ void Read_Msg()
 	error_code = error_code_interrupt;
 	
 	uc temp = a >> 4;
-	bit flag_d_line_3 = 0;
 	
-	if (temp > 4)
-	{
-		flag_d_line_3 = 1;
-		if (temp == 12)
-			temp = 7;	
-		temp -= 5;	// Checked this code in the online compiler - Works
-	}
-	
-	uc temp2 = 0x01 << temp;
-	if (flag_d_line_3)
-		temp2 |= 0x80;
-		
-	if (temp2 != mode)
+	if (temp != mode)
 		error_code = 1; 
 	
 	if (error_code == 0)
@@ -165,7 +171,7 @@ void Read_Msg()
 		{
 			if (error_code == 0)
 			{
-				temp2 = Rcv_numbers[temp];	// Bugs and features of the compiler
+				uc temp2 = Rcv_numbers[temp];	// Bugs and features of the compiler
 				if (flag_rw == 0)
 					LED[temp] = temp2;
 				else if (LED[temp] != temp2)
@@ -248,28 +254,7 @@ void Send()
 	//error_code = 0; //in Read_Msg()
 	
 	//Package [0]
-	Package[0] = 0;
-	temp = mode & 0x1F;	// 0b00011111
-	while (temp != 0x01)
-	{
-		temp = temp >> 1;
-		Package[0] += 1;
-	}
-	//Package[0] -= 1; // 0b00000001 == 0) Distance
-	if (mode & 0x80)
-	{
-		if (mode & 0x04)	// 0b00000100
-							// The alarm signal comes from the device in
-							// the field
-							// Initially, the "Crash" signal was a 12th mode, 
-							// but then it was reduced only to the 7th bit 
-							// in a 1m word
-			Package[0] = 12;	// Crash
-		else
-			Package[0] += 5;
-	}
-	if (Package[0] > 6)		//mode 7 is empty
-		Package[0] += 1;
+	Package[0] = mode;
 	
 	// the mode is greater than 13, or does 
 	// not fit into the limits for the mode

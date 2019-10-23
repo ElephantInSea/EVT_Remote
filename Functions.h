@@ -2,6 +2,7 @@
 
 void Btns_action (uc btn);
 bit Check (uc num);
+uc Get_port_e(uc part);
 void Read_Msg ();
 void Reg_Start_up ();
 void Send ();
