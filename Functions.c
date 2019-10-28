@@ -57,7 +57,7 @@ bit Check(uc num)
 {
 	
 	clrwdt();
-	if ((num > 12) || (num == 7))
+	if ((num == 7) || (num == 10) || (num == 11) || (num == 15))
 	{
 		error_code = 4;
 		return 0;
@@ -66,7 +66,7 @@ bit Check(uc num)
 		return 1;
 		
 	int i = 0;
-	int24 led_max = 1;
+	int24 led_max = 2047;
 	if (num == 0)
 		led_max = 199;
 	else if (num == 1)
@@ -76,9 +76,9 @@ bit Check(uc num)
 		led_max = 1999;
 	else if (num == 3)
 		led_max = 99;
-	else if (num > 3 && num < 7)	// 4, 5, 6
-		led_max = 2047;	
-	// For 8 and 9th modes, the limit will remain 1
+	else if (num > 7 && num < 10)	// 8, 9
+		led_max = 1;
+	// For 4-6 and 12-14 modes, the limit will remain 1
 	
 	int24 led_real = 0;
 	int24 factor = 1;
@@ -171,14 +171,16 @@ void Read_Msg()
 		{
 			if (error_code == 0)
 			{
-				uc temp2 = Rcv_numbers[temp];	// Bugs and features of the compiler
+				uc temp2 = Rcv_numbers[temp];	// Bugs and features of 
+												// the compiler
 				if (flag_rw == 0)
 					LED[temp] = temp2;
 				else if (LED[temp] != temp2)
 					error_code = 1;
 			}
 		}
-		// (error_code == 0) - Too many checks, but it saves the operation.
+		// (error_code == 0) - - Otherwise, the alarm signal will be 
+		// replaced by a parity error
 
 		if (b & 0x40)	// Alarm signal
 			error_code = 3;
@@ -270,11 +272,9 @@ void Send()
 	{
 		//Package [1]
 		//if (mode & 0x90)	// 0b10010000
-		if (Package[0] == 12 || Package[0] == 4 || Package[0] == 5)
+		if (Package[0] == 8 || Package[0] == 9)
 		{	
 			Package[1] = LED[4];
-			if (Package[0] == 12)
-				Package[1] = Package[1] << 6;
 			Package[2] = Package[3] = 0;
 		}
 		else
@@ -296,9 +296,8 @@ void Send()
 	temp = 0;
 	
 	
-	while ((i < max) && (temp < 250))
+	while ((i < max) && (temp < 150))
 	{	
-		
 		clrwdt();
 		if (i == 4)
 			TXEN = 0; // Transmitter Turn Off
@@ -353,13 +352,11 @@ void Send_part(bit flag_first_launch)
 		{
 			Read_Msg();
 			flag_msg_received = 0;
-			if (error_code  == 0)
+			if (error_code == 0)
 				flag_send_mode = 0;
 		}
 		else if (error_code != 4)
 			error_code = 2; // Line break
-		
-		
 	}
 }
 
@@ -402,5 +399,6 @@ uc Show_ERROR() // Remove
 
 	if (i == 255)
 		i = 0;
+		
 	return work_led;
 }

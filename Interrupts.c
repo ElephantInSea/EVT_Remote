@@ -41,9 +41,7 @@ void Handler_receiver ()
 			else if (count_receive_data == 2)
 				c = mail;
 			else
-			{
 				d = mail;
-			}
 			count_receive_data++;
 		}
 	}

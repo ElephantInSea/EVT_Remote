@@ -24,7 +24,6 @@ bit flag_manual_auto;
 // Cells for receiving messages
 uc a, b, c, d;
 uc count_receive_data;
-uc d_work_light;	// Not used - return by Show_error()
 uc error_code;
 uc error_code_interrupt;
 
@@ -72,11 +71,7 @@ void main(void)
     Btns_action(0);	// Bugs and features of the compiler
     Send();
     
-    int send_mode_count = 0;	// Send iteration
-    int send_error_count = 0;	
-    
 	int d_line = 0;	// Working indicator number
-	uc d_work_light = 0; // In case of work with 1 and 0 bits of port D
 	
     int led_blink = 0;
     
