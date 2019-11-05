@@ -74,7 +74,8 @@ void main(void)
     
 	int d_line = 0;	// Working indicator number
 	
-    int led_blink = 0;
+    uc led_blink = 0;
+    uc led_blink_temp = 0;
     
     uc mode_temp = 0, mode_time = 0;
     uc buttons = 0, buttons_time = 0; 
@@ -87,17 +88,24 @@ void main(void)
 		// PORT D --------------------------------------------------------------
 		temp = 0x20 << d_line; // 08
 		temp |= Show_ERROR (); //d_work_light;
+		PORTC = 0;
 		PORTD = temp;
 		
 		// PORT C --------------------------------------------------------------
 		if (d_line == led_active)	// For two iterations, the selected
-		{							// indicator will be turned off
-			led_blink ++;
-			if (led_blink > 2)		// Delay for blinking
-				led_blink = 0;
+		{
+			// indicator will be turned off
+			led_blink_temp ++;
+			if (led_blink_temp > 254)
+			{
+				led_blink_temp = 0;
+				led_blink ++;
+				if (led_blink > 254)		// Delay for blinking
+					led_blink = 0;
+			}
 		}
 		
-		if ((d_line == led_active) && led_blink)
+		if ((d_line == led_active) && (led_blink & 0x08))
 			temp = 0;
 		else
 		{
