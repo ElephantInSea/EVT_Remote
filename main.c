@@ -21,6 +21,7 @@ bit flag_send_mode;
 bit flag_rw; // 0 read, 1 write
 bit flag_msg_received;
 bit flag_manual_auto;
+bit flag_mode_ampl;
 // Cells for receiving messages
 uc a, b, c, d;
 uc count_receive_data;
@@ -84,7 +85,7 @@ void main(void)
 	{		
 		clrwdt();
 		// PORT D --------------------------------------------------------------
-		temp = 0x08 << d_line;
+		temp = 0x20 << d_line; // 08
 		temp |= Show_ERROR (); //d_work_light;
 		PORTD = temp;
 		
@@ -175,7 +176,7 @@ void main(void)
 		}
 		
 		d_line ++;
-		if (d_line > 4)
+		if (d_line > 2) // 4
 			d_line = 0;
 		
 	}

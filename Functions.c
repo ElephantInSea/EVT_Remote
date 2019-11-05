@@ -84,7 +84,7 @@ bit Check(uc num)
 	int24 factor = 1;
 	for (i = 0; i < 5; i ++)
 	{
-		int j = 0, j_max = (int)LED[i];
+		int j = 0, j_max = (int)LED[4-i];
 		int24 temp = 0;
 		//led_real += factor * temp;	compilator fail
 		for (j = 0; j < j_max; j ++)
@@ -142,6 +142,9 @@ void Read_Msg()
 	error_code = error_code_interrupt;
 	
 	uc temp = a >> 4;
+	
+	if (flag_mode_ampl == 1)
+		temp -= 8;
 	
 	if (temp != mode)
 		error_code = 1; 
@@ -241,6 +244,8 @@ void Reg_Start_up ()
     flag_msg_received = 0;	// Flag of received message
     error_code = 0;
     error_code_interrupt = 0;
+    
+	flag_mode_ampl = 0;	// 
 }
 
 void Send()
@@ -257,6 +262,24 @@ void Send()
 	
 	//Package [0]
 	Package[0] = mode;
+	
+	
+	if ((Package[0] > 3) && (Package[0] < 7)) 
+	{
+		if ((flag_mode_ampl == 0) && (LED[0] == 9))
+			flag_mode_ampl = 1;
+	}
+
+	if (flag_mode_ampl == 1)
+	{
+		if ((Package[0] < 4) || (Package[0] > 6))
+			flag_mode_ampl = 0;
+		else
+		{
+			Package[0] += 8;
+			flag_rw = 0;
+		}
+	}
 	
 	// the mode is greater than 13, or does 
 	// not fit into the limits for the mode
@@ -345,15 +368,18 @@ void Send_part(bit flag_first_launch)
 	
 	if (((i == 0) && (j == 1)) || (flag_first_launch == 1))
 		Send();
-	else if ((i == 3) || (flag_msg_received == 1))
+	else if ((i == 3) || ((flag_msg_received == 1) && (flag_mode_ampl == 0)))
 	{
 		i = j = 0;
 		if (flag_msg_received == 1)
 		{
 			Read_Msg();
 			flag_msg_received = 0;
-			if (error_code == 0)
-				flag_send_mode = 0;
+			if (flag_mode_ampl == 0)
+			{
+				if (error_code == 0)
+					flag_send_mode = 0;
+			}
 		}
 		else if (error_code != 4)
 			error_code = 2; // Line break
