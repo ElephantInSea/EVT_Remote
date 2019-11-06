@@ -27,7 +27,7 @@ void Btns_action (uc btn)
 	}
 	else if (btn & 0x04)	// Left
 	{
-		if (led_active == 0)
+		if (led_active == 4 - led_count)
 			led_active = 5;
 		led_active --;
 	}
@@ -35,7 +35,7 @@ void Btns_action (uc btn)
 	{
 		led_active ++;
 		if (led_active > 4)
-			led_active = 0;
+			led_active = 4 - led_count;
 	}
 	else if (btn & 0x10)	// Send
 	{
@@ -51,6 +51,21 @@ void Btns_action (uc btn)
 		//--------------------------
 	}
 	return;
+}
+
+void Change_led_count (uc num)
+{
+	if (num == 0)
+		led_count = 2;
+	else if (num == 1)
+		led_count = 4;
+	else if (num == 3)
+		led_count = 1;
+	else if (num > 7 && num < 10)	// 8, 9
+		led_count = 0;
+	else
+		led_count = 3;
+	led_active = 4;
 }
 
 bit Check(uc num)
@@ -244,8 +259,9 @@ void Reg_Start_up ()
     flag_msg_received = 0;	// Flag of received message
     error_code = 0;
     error_code_interrupt = 0;
+    led_count = 3;
     
-	flag_mode_ampl = 0;	// 
+	flag_mode_ampl = 0;	
 }
 
 void Send()
@@ -375,11 +391,9 @@ void Send_part(bit flag_first_launch)
 		{
 			Read_Msg();
 			flag_msg_received = 0;
-			if (flag_mode_ampl == 0)
-			{
-				if (error_code == 0)
+			if ((flag_mode_ampl == 0) && (error_code == 0))
 					flag_send_mode = 0;
-			}
+			
 		}
 		else if (error_code != 4)
 			error_code = 2; // Line break

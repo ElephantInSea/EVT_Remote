@@ -12,7 +12,7 @@ typedef unsigned char uc;
 
 const uc Translate_num_to_LED[10] = {
 //  0,	  1,	2,	  3,	4,	  5,	6,	  7,	8,	  9.
-	0xC0, 0xF9, 0xA4, 0xB0, 0x98, 0x92, 0x82, 0xF8, 0x80, 0x90};
+	0xC0, 0xF9, 0xA4, 0xB0, 0x99, 0x92, 0x82, 0xF8, 0x80, 0x90};
 uc LED [5];
 int led_active;
 uc mode;
@@ -27,6 +27,7 @@ uc a, b, c, d;
 uc count_receive_data;
 uc error_code;
 uc error_code_interrupt;
+uc led_count;
 
 #include "Interrupts.h"
 
@@ -105,7 +106,9 @@ void main(void)
 			}
 		}
 		
-		if ((d_line == led_active) && (led_blink & 0x08))
+		if (d_line < 4 - led_count)
+			temp = 0;
+		else if ((d_line == led_active) && (led_blink & 0x08))
 			temp = 0;
 		else
 		{
@@ -140,6 +143,7 @@ void main(void)
 						mode = temp;
 						flag_send_mode = 1;
 						flag_rw = 0; //Read
+						Change_led_count (mode);
 					}
 				}
 				else

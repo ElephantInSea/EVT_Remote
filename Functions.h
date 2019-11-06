@@ -1,6 +1,7 @@
 /*The project "Respondent". Association "EVT".*/
 
 void Btns_action (uc btn);
+void Change_led_count (uc num);
 bit Check (uc num);
 uc Get_port_e(uc part);
 void Read_Msg ();
