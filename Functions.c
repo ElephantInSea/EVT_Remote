@@ -2,6 +2,7 @@
 
 void Btns_action (uc btn)
 {
+	// Called in main - Button part 
 	uc temp = btn, count = 0;
 	while(temp)
 	{
@@ -9,6 +10,7 @@ void Btns_action (uc btn)
 			count ++;
 		temp = temp >> 1;
 	}
+	
 	// Will not work if none is pressed, or pressed more than 2 buttons
 	if (count != 1)
 		return;
@@ -27,15 +29,15 @@ void Btns_action (uc btn)
 	}
 	else if (btn & 0x04)	// Left
 	{
-		if (led_active == 4 - led_count)
-			led_active = 5;
-		led_active --;
+		led_active ++;
+		if (led_active > led_count)
+			led_active = 0;
 	}
 	else if (btn & 0x08)	// Right
 	{
-		led_active ++;
-		if (led_active > 4)
-			led_active = 4 - led_count;
+		if (led_active == 0)
+			led_active = led_count + 1; 
+		led_active --;
 	}
 	else if (btn & 0x10)	// Send
 	{
@@ -45,9 +47,7 @@ void Btns_action (uc btn)
 			flag_rw = 1; //Write
 		}
 		else //STOP sending
-		{
 			flag_send_mode = flag_rw = 0;
-		}
 		//--------------------------
 	}
 	return;
@@ -55,6 +55,8 @@ void Btns_action (uc btn)
 
 void Change_led_count (uc num)
 {
+	// Called in main - Mode part
+	// The number of indicators depends on the mode selected.
 	if (num == 0)
 		led_count = 2;
 	else if (num == 1)
@@ -65,27 +67,28 @@ void Change_led_count (uc num)
 		led_count = 0;
 	else
 		led_count = 3;
-	led_active = 4;
 }
 
-bit Check(uc num)
+void Check_and_correct(uc num)
 {
-	
+	// Called in Send
 	clrwdt();
+	// 10 = A, 11 = B, 15 = F
 	if ((num == 7) || (num == 10) || (num == 11) || (num == 15))
 	{
 		error_code = 4;
-		return 0;
+		return;
 	}	
 	else if (flag_rw == 0) // When reading, only the mode number is important
-		return 1;
+		return;
 		
 	int i = 0;
 	int24 led_max = 2047;
+	
 	if (num == 0)
 		led_max = 199;
 	else if (num == 1)
-		return 1;
+		return;
 		//led_max = 99999; // This is the maximum scoreboard
 	else if (num == 2)
 		led_max = 1999;
@@ -97,10 +100,12 @@ bit Check(uc num)
 	
 	int24 led_real = 0;
 	int24 factor = 1;
+	int24 temp = 0;
+	
 	for (i = 0; i < 5; i ++)
 	{
-		int j = 0, j_max = (int)LED[4-i];
-		int24 temp = 0;
+		int j = 0, j_max = (int)LED[i];
+		temp = 0;
 		//led_real += factor * temp;	compilator fail
 		for (j = 0; j < j_max; j ++)
 			temp += factor;
@@ -112,9 +117,8 @@ bit Check(uc num)
 	//If the limit is exceeded - the display will reset to the maximum value
 	if (led_real > led_max)
 	{
-		//return 0;
-		int24 temp = 10000;
-		for (i = 0; i < 5; i ++)
+		temp = 10000;
+		for (i = 4; i >= 0; i --)
 		{
 			//I doubt it
 			// LED[i] = (led max / (10000 / (10^i))) % 10`
@@ -124,34 +128,36 @@ bit Check(uc num)
 			temp /= 10;
 		}
 	}
-	return 1;
+	return;
 }
 
 uc Get_port_e(uc part)
 {
+	// Called in main - Mode part
 	uc ans = 0;
 	if (part == 3)
 		ans += 5;
 	
 	part = (PORTE ^ 0xF8) >> 3; // 0b000xxxxx
 	
-	while (part != 0x01)
+	uc i;
+	for(i = 0; i < 5; i ++)
 	{
+		if (part & (0x01))
+			ans += i;
 		part = part >> 1;
-		ans += 1;
 	}
+	
 	if (ans > 6)
 		ans += 1;
-	/* Here you can enter the setting of the amplitude mode 1, 2, 3 */
+	
 	return ans;
 }
 
 void Read_Msg()
 {
-	
+	// Called in Send_part()
 	clrwdt();
-	// Call from Send_part()
-	// bit flag_correct = 1;
 	// Package[0]
 	
 	error_code = error_code_interrupt;
@@ -166,7 +172,6 @@ void Read_Msg()
 	
 	if (error_code == 0)
 	{
-		temp = a >> 4;
 		uc Rcv_numbers [5];
 		
 		Rcv_numbers[0] = Rcv_numbers[1] = 0;
@@ -174,14 +179,14 @@ void Read_Msg()
 		
 		// Package[1] - Package[3]
 		if (temp == 8 || temp == 9)
-			Rcv_numbers[4] = b & 0x01;
+			Rcv_numbers[0] = b & 0x01;
 		else 
 		{
-			Rcv_numbers[0] = b & 0x0F;
-			Rcv_numbers[1] = c >> 4;
+			Rcv_numbers[4] = b & 0x0F;
+			Rcv_numbers[3] = c >> 4;
 			Rcv_numbers[2] = c & 0x0F;
-			Rcv_numbers[3] = d >> 4;
-			Rcv_numbers[4] = d & 0x0F;
+			Rcv_numbers[2] = d >> 4;
+			Rcv_numbers[1] = d & 0x0F;
 		}
 		
 		
@@ -208,6 +213,7 @@ void Read_Msg()
 
 void Reg_Start_up ()
 {
+	// Call from main
 	GLINTD = 1;		// Disable All Interrupts
 	PORTE = 0x00;	// Getting button codes and modes
 	DDRE  = 0x00;
@@ -246,26 +252,28 @@ void Reg_Start_up ()
 	
 	PORTE = 0;
 	
-	LED[0] = LED[1] = LED[2] = LED[3] = LED[4] = 0;
-	
-    flag_send_mode = 0;		// Turn on to receive data
-    flag_rw = 0;
-	led_active = 4;	// The number of the selected indicator. 
-					// 4 is the far left
-    mode = 255;
-    
-    count_receive_data = 0;
-    a = b = c = d = 0;
+	// Flags
+	flag_manual_auto = 0;
+	flag_mode_ampl = 0;	
     flag_msg_received = 0;	// Flag of received message
+    flag_rw = 0;
+    flag_send_mode = 0;		// Turn on to receive data
+    
+    // Variables
+	LED[0] = LED[1] = LED[2] = LED[3] = LED[4] = 0;
+    a = b = c = d = 0;
+    count_receive_data = 0;
     error_code = 0;
     error_code_interrupt = 0;
-    led_count = 3;
-    
-	flag_mode_ampl = 0;	
+	led_active = 0;	// The number of the selected indicator. 
+					// 4 is the far left
+    led_count = 2;
+    mode = 255;
 }
 
 void Send()
 {	
+	// Call from Send_part()
 	uc Package [4], temp = 0;
 	
 	clrwdt();
@@ -282,7 +290,7 @@ void Send()
 	
 	if ((Package[0] > 3) && (Package[0] < 7)) 
 	{
-		if ((flag_mode_ampl == 0) && (LED[0] == 9))
+		if ((flag_mode_ampl == 0) && (LED[3] == 9))
 			flag_mode_ampl = 1;
 	}
 
@@ -299,10 +307,11 @@ void Send()
 	
 	// the mode is greater than 13, or does 
 	// not fit into the limits for the mode
-	if (Check(Package[0]) == 0)
+	Check_and_correct(Package[0]);
+	if (error_code > 0)
 	{
 		flag_msg_received = 1;
-		return ;//0;
+		return;
 	}
 	
 	if (flag_rw == 0) // Read
@@ -313,14 +322,14 @@ void Send()
 		//if (mode & 0x90)	// 0b10010000
 		if (Package[0] == 8 || Package[0] == 9)
 		{	
-			Package[1] = LED[4];
+			Package[1] = LED[0];
 			Package[2] = Package[3] = 0;
 		}
 		else
 		{
-			Package[1] = LED[0];
-			Package[2] = (LED[1] << 4) | LED[2];
-			Package[3] = (LED[3] << 4) | LED[4];
+			Package[1] = LED[4];
+			Package[2] = (LED[3] << 4) | LED[2];
+			Package[3] = (LED[1] << 4) | LED[0];
 		}
 		Package[1] |= 0x80;
 	}
@@ -330,7 +339,6 @@ void Send()
 	
 	Package[0] = (Package[0] << 4) | 0x0F;
 	
-	//for (i=0;i<4;i++)
 	int i = 0, max = 4;
 	temp = 0;
 	
@@ -358,7 +366,6 @@ void Send()
 		}
 		else
 			temp ++;	// fuze
-		//not_send = 0;
 	}
 	
 	

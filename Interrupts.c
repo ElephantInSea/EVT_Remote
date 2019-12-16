@@ -2,7 +2,8 @@
 
 
 void Check_mail (uc mail, bit nine)
-{		
+{
+	// Called in Handler_receiver
 	while (mail)
 	{
 		if (mail & 0x01)
@@ -18,6 +19,7 @@ void Check_mail (uc mail, bit nine)
 
 void Handler_receiver ()
 {
+	// Called in main - Interruption part
 	/*Reception of data in variables a, b, c, d*/
 		
 	if(count_receive_data == 0)

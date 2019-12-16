@@ -13,21 +13,21 @@ typedef unsigned char uc;
 const uc Translate_num_to_LED[10] = {
 //  0,	  1,	2,	  3,	4,	  5,	6,	  7,	8,	  9.
 	0xC0, 0xF9, 0xA4, 0xB0, 0x99, 0x92, 0x82, 0xF8, 0x80, 0x90};
-uc LED [5];
-int led_active;
-uc mode;
 
-bit flag_send_mode;
-bit flag_rw; // 0 read, 1 write
-bit flag_msg_received;
 bit flag_manual_auto;
 bit flag_mode_ampl;
-// Cells for receiving messages
-uc a, b, c, d;
+bit flag_msg_received;
+bit flag_rw; // 0 read, 1 write
+bit flag_send_mode;
+
+uc LED [5];
+uc a, b, c, d;	// Cells for receiving messages
 uc count_receive_data;
 uc error_code;
 uc error_code_interrupt;
+int led_active;
 uc led_count;
+uc mode;
 
 #include "Interrupts.h"
 
@@ -36,7 +36,6 @@ interrupt iServer(void)
 	multi_interrupt_entry_and_save
 
 	PERIPHERAL_service:
-		
 		Handler_receiver ();
 		interrupt_exit_and_restore
 	TMR0_service:
@@ -52,9 +51,6 @@ interrupt iServer(void)
 	INT_service:
 		INTF = 0;
 		interrupt_exit_and_restore
-		
-	/*Прием даных. В a, b, c, d
-	msg_received = 1;*/
 }
 
 #include "Interrupts.c"
@@ -68,32 +64,26 @@ void main(void)
 	Reg_Start_up();
 
 	uc temp = 0;
-	
-    Check(255);
-    Btns_action(0);	// Bugs and features of the compiler
-    Send();
-    
 	int d_line = 0;	// Working indicator number
-	
+    bit flag_first_launch = 1;
     uc led_blink = 0;
     uc led_blink_temp = 0;
     
     uc mode_temp = 0, mode_time = 0;
     uc buttons = 0, buttons_time = 0; 
     
-    bit flag_first_launch = 1;
 	
 	while (1)
 	{		
 		clrwdt();
 		// PORT D --------------------------------------------------------------
-		temp = 0x20 << d_line; // 08
-		temp |= Show_ERROR (); //d_work_light;
+		temp = 0x08 << d_line; 
+		temp |= Show_ERROR (); 
 		PORTC = 0;
 		PORTD = temp;
 		
 		// PORT C --------------------------------------------------------------
-		if (d_line == led_active)	// For two iterations, the selected
+		if (d_line == led_active)
 		{
 			// indicator will be turned off
 			led_blink_temp ++;
@@ -106,7 +96,7 @@ void main(void)
 			}
 		}
 		
-		if (d_line < 4 - led_count)
+		if (d_line > led_count)
 			temp = 0;
 		else if ((d_line == led_active) && (led_blink & 0x08))
 			temp = 0;
@@ -116,6 +106,10 @@ void main(void)
 									// here.
 			temp = Translate_num_to_LED[(int)temp];
 		}
+		
+		if ((flag_send_mode == 1) && (d_line == 0))
+			temp |= 0x01; // Point on the right indicator
+			
 		PORTC = temp;
 		
 		
@@ -152,7 +146,7 @@ void main(void)
 					flag_send_mode = 0;
 					mode_temp = temp;
 					mode_time = 0;
-					led_active = 4;
+					led_active = 0;
 					LED[0] = LED[1] = LED[2] = LED[3] = LED[4] = 0;
 				}
 			}	
@@ -188,7 +182,7 @@ void main(void)
 		}
 		
 		d_line ++;
-		if (d_line > 2) // 4
+		if (d_line > 4) 
 			d_line = 0;
 		
 	}
